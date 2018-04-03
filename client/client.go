@@ -21,6 +21,8 @@ var (
 )
 
 func SendToServer(request types.Request) {
+	fmt.Println("Sending to server...")
+
 	data, err := util.GobToBytes(request)
 
 	if err != nil {
@@ -28,10 +30,13 @@ func SendToServer(request types.Request) {
 		return
 	}
 
+	fmt.Println("Writing...")
+
 	connection.Write(data) // TODO: get error, handle
 }
 
 func CreateGame() {
+	fmt.Println("creating game...")
 	if gameId != 0 {
 		fmt.Println("You're already in a game!")
 		return
@@ -128,10 +133,12 @@ func ListenForInput() {
 func Run(serverPort string) {
 	// create addresses
 
-	connection, error := net.Dial("tcp", "localhost" + serverPort)
+	conn, error := net.Dial("tcp", "localhost" + serverPort)
 	if error != nil {
 			fmt.Println(error)
 	}
+
+	connection = conn
 
 	client := &types.Client{Socket: connection}
 

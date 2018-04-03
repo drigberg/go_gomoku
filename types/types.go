@@ -22,7 +22,7 @@ func (client *Client) Receive() {
         }
         if length > 0 {
             // switch
-                fmt.Println("RECEIVED: " + string(message))
+                fmt.Println("CLIENT RECEIVED: " + string(message))
         }
 	}
 }

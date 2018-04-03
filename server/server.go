@@ -138,7 +138,7 @@ func (manager *ClientManager) receive(client *types.Client) {
             break
         }
         if length > 0 {
-            fmt.Println("RECEIVED: " + string(message))
+            fmt.Println("SERVER RECEIVED: " + string(message))
             manager.broadcast <- message
         }
     }
