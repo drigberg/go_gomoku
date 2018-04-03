@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"net"
-	"time"
 	"bytes"
 	"encoding/gob"
 	"gomoku/types"
+	"bufio"
 )
 
 func CheckError(err error) {
@@ -17,14 +17,38 @@ func CheckError(err error) {
     }
 }
 
-func AcceptConnection(conn net.Conn, handler func(net.Conn, types.Request)) {
-	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
-
+func AcceptConnection(conn net.Conn, handler func(*bufio.ReadWriter, types.Request)) {
+	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	defer conn.Close()
 
-	data := HandleGob(conn)
+	for {
+		response, err := rw.Read([]byte(""))
+		fmt.Println("RESPONSE:", response)
+		fmt.Println(err)
 
-	handler(conn, data)
+		data := HandleRwGob(rw)
+
+		fmt.Println("DATA:", data)
+		go handler(rw, data)
+		fmt.Println("Handled!")
+	}
+}
+
+func HandleRwGob(rw *bufio.ReadWriter) types.Request {
+	fmt.Println("Receive GOB data!")
+
+	var data types.Request
+
+	decoder := gob.NewDecoder(rw)
+	err := decoder.Decode(&data)
+
+	if err != nil {
+		fmt.Println("Error decoding GOB data:", err)
+	}
+
+	fmt.Printf("Data received: \n%#v\n", data)
+
+	return data
 }
 
 func HandleGob(conn net.Conn) types.Request {

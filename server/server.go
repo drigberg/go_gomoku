@@ -3,6 +3,7 @@ package server
 import (
     "net"
     "fmt"
+    "bufio"
     "gomoku/util"
     "gomoku/types"
     "gomoku/constants"
@@ -13,14 +14,17 @@ var (
     gameId = 0
 )
 
-func CreateGame(req types.Request) int {
+func CreateGame(req types.Request, rw *bufio.ReadWriter) int {
     gameId += 1
-    players := [2]int{req.UserId}
+    players := [2]int{req.UserId, -1}
+    channels := [2]*bufio.ReadWriter{rw}
+
     spots := make(map[int][]types.Coord)
     spots[req.UserId] = []types.Coord{}
 
     games[gameId] = types.GameRoom{
         Id: gameId,
+        Channels: channels,
         Spots: spots,
         Players: players,
         Messages: [6]string{},
@@ -29,13 +33,13 @@ func CreateGame(req types.Request) int {
     return gameId
 }
 
-func HandleRequest(conn net.Conn, req types.Request) {
+func HandleRequest(rw *bufio.ReadWriter, req types.Request) {
     fmt.Println("Received!")
     fmt.Println(req)
 
     switch action := req.Action; action {
     case constants.CREATE:
-        gameId := CreateGame(req)
+        gameId := CreateGame(req, rw)
 
         response := types.Request{
             GameId: gameId,
@@ -49,7 +53,7 @@ func HandleRequest(conn net.Conn, req types.Request) {
 			return
 		}
 
-        _, err = conn.Write(data)
+        _, err = rw.Write(data)
         util.CheckError(err)
     case constants.JOIN:
         game := games[req.GameId]
@@ -71,7 +75,7 @@ func HandleRequest(conn net.Conn, req types.Request) {
 			return
 		}
 
-        _, err = conn.Write(data)
+        _, err = rw.Write(data)
         util.CheckError(err)
 
         // choose random player to go first
@@ -79,7 +83,11 @@ func HandleRequest(conn net.Conn, req types.Request) {
         response := types.Request{
 			Action: constants.MESSAGE,
 			Data: req.Data,
-		}
+        }
+
+        game := games[req.GameId]
+
+        otherPlayerRW := game.Channels[1]
 
 		data, err := util.GobToBytes(response)
 
@@ -88,13 +96,29 @@ func HandleRequest(conn net.Conn, req types.Request) {
 			return
 		}
 
-        _, err = conn.Write(data)
+        _, err = otherPlayerRW.Write(data)
         util.CheckError(err)
+
+        err = otherPlayerRW.Flush()
+        if err != nil {
+            fmt.Println("Flush failed!")
+        }
+
+        _, err = rw.Write(data)
+        util.CheckError(err)
+
+
     default:
         fmt.Println("Unrecognized action!")
     }
 
+	err := rw.Flush()
+	if err != nil {
+		fmt.Println("Flush failed!")
+	}
+
     fmt.Println(games)
+    fmt.Println("\n")
 }
 
 func Run(port string) {
@@ -105,7 +129,7 @@ func Run(port string) {
     listener, err := net.ListenTCP("tcp", tcpAddr)
 	util.CheckError(err)
 
-    fmt.Println("Running server!")
+    fmt.Println("Listening on " + listener.Addr().String())
 
     for {
 		conn, err := listener.Accept()
