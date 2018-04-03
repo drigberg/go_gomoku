@@ -4,9 +4,9 @@ import (
     "net"
     "fmt"
     "bufio"
-    "gomoku/util"
-    "gomoku/types"
-    "gomoku/constants"
+    "go_gomoku/util"
+    "go_gomoku/types"
+    "go_gomoku/constants"
 )
 
 var (

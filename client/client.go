@@ -8,9 +8,9 @@ import (
 	"os"
 	"fmt"
 	"strconv"
-	"gomoku/util"
-	"gomoku/types"
-	"gomoku/constants"
+	"go_gomoku/util"
+	"go_gomoku/types"
+	"go_gomoku/constants"
 )
 
 var (

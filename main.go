@@ -2,8 +2,8 @@ package main
 
 import (
     "flag"
-    "gomoku/server"
-    "gomoku/client"
+    "go_gomoku/server"
+    "go_gomoku/client"
     "fmt"
     "os"
 )

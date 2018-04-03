@@ -6,7 +6,7 @@ import (
 	"net"
 	"bytes"
 	"encoding/gob"
-	"gomoku/types"
+	"go_gomoku/types"
 	"bufio"
 )
 
