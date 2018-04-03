@@ -16,15 +16,9 @@ import (
 var (
 	scanner = bufio.NewScanner(os.Stdin)
 	gameId = 0
-	rw *bufio.ReadWriter
+	connection net.Conn
 	yourTurn = false
 )
-
-func HandleRequest(rw *bufio.ReadWriter, req types.Request) {
-    fmt.Print("received: ", req)
-
-    rw.Write([]byte("message received!"))
-}
 
 func SendToServer(request types.Request) {
 	data, err := util.GobToBytes(request)
@@ -34,12 +28,7 @@ func SendToServer(request types.Request) {
 		return
 	}
 
-	_, err = rw.Write(data)
-	util.CheckError(err)
-
-	err = rw.Flush()
-
-	util.CheckError(err)
+	connection.Write(data) // TODO: get error, handle
 }
 
 func CreateGame() {
@@ -55,15 +44,14 @@ func CreateGame() {
 
 	SendToServer(request)
 
-	result := util.HandleRwGob(rw)
-
-	if result.Action == constants.SUCCESS {
-		fmt.Println("Created game #", result.GameId)
-		gameId = result.GameId
-		yourTurn = true
-	} else {
-		fmt.Println("Error! Could not create game.")
-	}
+	// result := util.HandleRwGob(rw)
+	// if result.Action == constants.SUCCESS {
+	// 	fmt.Println("Created game #", result.GameId)
+	// 	gameId = result.GameId
+	// 	yourTurn = true
+	// } else {
+	// 	fmt.Println("Error! Could not create game.")
+	// }
 }
 
 func JoinGame(gameIdStr string) {
@@ -82,17 +70,17 @@ func JoinGame(gameIdStr string) {
 
 	SendToServer(request)
 
-	result := util.HandleRwGob(rw)
+	// result := util.HandleRwGob(rw)
 
-	if result.Action == constants.SUCCESS {
-		fmt.Println("Joined game #", result.GameId)
-		gameId = result.GameId
-	} else {
-		fmt.Println("Error! Could not create game.")
-	}
+	// if result.Action == constants.SUCCESS {
+	// 	fmt.Println("Joined game #", result.GameId)
+	// 	gameId = result.GameId
+	// } else {
+	// 	fmt.Println("Error! Could not create game.")
+	// }
 }
 
-func SendMessage(tcpAddr *net.TCPAddr, text string) {
+func SendMessage(text string) {
 	if gameId == 0 {
 		fmt.Println("You're not in a game yet!")
 		return
@@ -107,13 +95,13 @@ func SendMessage(tcpAddr *net.TCPAddr, text string) {
 
 	SendToServer(request)
 
-	result := util.HandleRwGob(rw)
+	// result := util.HandleRwGob(rw)
 
-	fmt.Print(result)
-	fmt.Println(result.Data)
+	// fmt.Print(result)
+	// fmt.Println(result.Data)
 }
 
-func ListenForInput(tcpAddr *net.TCPAddr) {
+func ListenForInput() {
     for scanner.Scan() {
 		text := scanner.Text()
 
@@ -125,7 +113,7 @@ func ListenForInput(tcpAddr *net.TCPAddr) {
 		case "jn":
 			JoinGame(text[3:])
 		case "mg":
-			SendMessage(tcpAddr, text[3:])
+			SendMessage(text[3:])
 		default:
 			fmt.Println("Unrecognized command! Type 'hp' for help!")
 		}
@@ -136,52 +124,17 @@ func ListenForInput(tcpAddr *net.TCPAddr) {
 	}
 }
 
-func listenForWrite() {
-	for {
-		response, err := rw.Read([]byte(""))
-		fmt.Println("RESPONSE:", response)
-		fmt.Println(err)
 
-		data := util.HandleRwGob(rw)
-
-		fmt.Println("DATA:", data)
-	}
-}
-
-func ListenForConnection(listener *net.TCPListener) {
-    for {
-		conn, err := listener.Accept()
-
-        if err != nil {
-            continue
-		}
-
-        go util.AcceptConnection(conn, HandleRequest)
-    }
-}
-
-func Run(clientPort string, serverPort string) {
+func Run(serverPort string) {
 	// create addresses
-    clientAddr, err := net.ResolveTCPAddr("tcp4", clientPort)
-	util.CheckError(err)
 
-	serverAddr, err := net.ResolveTCPAddr("tcp4", serverPort)
-	util.CheckError(err)
+	connection, error := net.Dial("tcp", "localhost" + serverPort)
+	if error != nil {
+			fmt.Println(error)
+	}
 
-	// create listener
-    listener, err := net.ListenTCP("tcp", clientAddr)
-	util.CheckError(err)
+	client := &types.Client{Socket: connection}
 
-	fmt.Println("Running client!")
-
-	// establish connection to server
-	conn, err := net.DialTCP("tcp", nil, serverAddr)
-	util.CheckError(err)
-
-	rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-
-	// listen?
-	go listenForWrite()
-	go ListenForConnection(listener)
-    ListenForInput(serverAddr)
+	go client.Receive()
+	ListenForInput()
 }
