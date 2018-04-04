@@ -1,7 +1,6 @@
 package types
 
 import (
-    "bufio"
     "net"
     "fmt"
 )
@@ -34,7 +33,7 @@ type Coord struct {
 
 type GameRoom struct {
     Id int
-    Channels [2]*bufio.ReadWriter
+    Clients [2]*Client
     Spots map[int][]Coord
     Players [2]int
     Messages [6]string

@@ -3,7 +3,6 @@ package server
 import (
     "net"
     "fmt"
-    "bufio"
     "go_gomoku/util"
     "go_gomoku/types"
     "go_gomoku/constants"
@@ -14,17 +13,17 @@ var (
     gameId = 0
 )
 
-func CreateGame(req types.Request, rw *bufio.ReadWriter) int {
+func CreateGame(req types.Request, client *types.Client) int {
     gameId += 1
     players := [2]int{req.UserId, -1}
-    channels := [2]*bufio.ReadWriter{rw}
+    clients := [2]*types.Client{client}
 
     spots := make(map[int][]types.Coord)
     spots[req.UserId] = []types.Coord{}
 
     games[gameId] = types.GameRoom{
         Id: gameId,
-        Channels: channels,
+        Clients: clients,
         Spots: spots,
         Players: players,
         Messages: [6]string{},
@@ -33,89 +32,86 @@ func CreateGame(req types.Request, rw *bufio.ReadWriter) int {
     return gameId
 }
 
-func HandleRequest(rw *bufio.ReadWriter, req types.Request) {
+func HandleRequest(req types.Request, client *types.Client) {
     fmt.Println("Received!")
     fmt.Println(req)
 
     switch action := req.Action; action {
     case constants.CREATE:
-        gameId := CreateGame(req, rw)
+        gameId := CreateGame(req, client)
 
         response := types.Request{
             GameId: gameId,
 			Action: constants.SUCCESS,
 		}
 
-		data, err := util.GobToBytes(response)
+		message, err := util.GobToBytes(response)
 
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-        _, err = rw.Write(data)
-        util.CheckError(err)
-    case constants.JOIN:
-        game := games[req.GameId]
-
-        game.Players[1] = req.UserId
-        game.Spots[req.UserId] = []types.Coord{}
-        game.Messages[0] = "Let the game begin!"
-        game.Turn = 1
-
-        response := types.Request{
-            GameId: req.GameId,
-			Action: constants.SUCCESS,
-		}
-
-		data, err := util.GobToBytes(response)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-        _, err = rw.Write(data)
-        util.CheckError(err)
-
-        // choose random player to go first
-    case constants.MESSAGE:
-        response := types.Request{
-			Action: constants.MESSAGE,
-			Data: req.Data,
+        select {
+        case client.Data <- message:
+        default:
+            close(client.Data)
         }
 
-        game := games[req.GameId]
+    // case constants.JOIN:
+    //     game := games[req.GameId]
 
-        otherPlayerRW := game.Channels[1]
+    //     game.Players[1] = req.UserId
+    //     game.Spots[req.UserId] = []types.Coord{}
+    //     game.Messages[0] = "Let the game begin!"
+    //     game.Turn = 1
 
-		data, err := util.GobToBytes(response)
+    //     response := types.Request{
+    //         GameId: req.GameId,
+	// 		Action: constants.SUCCESS,
+	// 	}
 
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	// 	data, err := util.GobToBytes(response)
 
-        _, err = otherPlayerRW.Write(data)
-        util.CheckError(err)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		return
+	// 	}
 
-        err = otherPlayerRW.Flush()
-        if err != nil {
-            fmt.Println("Flush failed!")
-        }
+    //     _, err = rw.Write(data)
+    //     util.CheckError(err)
 
-        _, err = rw.Write(data)
-        util.CheckError(err)
+    //     // choose random player to go first
+    // case constants.MESSAGE:
+    //     response := types.Request{
+	// 		Action: constants.MESSAGE,
+	// 		Data: req.Data,
+    //     }
 
+    //     game := games[req.GameId]
 
+    //     otherPlayerRW := game.Channels[1]
+
+	// 	data, err := util.GobToBytes(response)
+
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		return
+	// 	}
+
+    //     _, err = otherPlayerRW.Write(data)
+    //     util.CheckError(err)
+
+    //     err = otherPlayerRW.Flush()
+    //     if err != nil {
+    //         fmt.Println("Flush failed!")
+    //     }
+
+    //     _, err = rw.Write(data)
+    //     util.CheckError(err)
     default:
         fmt.Println("Unrecognized action!")
     }
-
-	err := rw.Flush()
-	if err != nil {
-		fmt.Println("Flush failed!")
-	}
 
     fmt.Println(games)
     fmt.Println("\n")
@@ -138,8 +134,15 @@ func (manager *ClientManager) receive(client *types.Client) {
             break
         }
         if length > 0 {
-            fmt.Println("SERVER RECEIVED: " + string(message))
-            manager.broadcast <- message
+            // convert to gob
+            //handle
+            fmt.Println("Received...")
+
+            request := util.DecodeGob(message)
+            fmt.Println("Decoded...")
+
+            HandleRequest(request, client)
+            // manager.broadcast <- message
         }
     }
 }
@@ -184,6 +187,8 @@ func (manager *ClientManager) start() {
 
 func Run(port string) {
     fmt.Println("Starting server...")
+    games = make(map[int]types.GameRoom)
+
     listener, error := net.Listen("tcp", port)
 
     if error != nil {

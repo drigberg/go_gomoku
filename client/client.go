@@ -20,6 +20,7 @@ var (
 	yourTurn = false
 )
 
+// Send request struct to server as byte array
 func SendToServer(request types.Request) {
 	fmt.Println("Sending to server...")
 

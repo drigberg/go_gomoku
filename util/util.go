@@ -39,8 +39,8 @@ func HandleRwGob(rw *bufio.ReadWriter) types.Request {
 
 	var data types.Request
 
-	decoder := gob.NewDecoder(rw)
-	err := decoder.Decode(&data)
+	dec := gob.NewDecoder(rw)
+	err := dec.Decode(&data)
 
 	if err != nil {
 		fmt.Println("Error decoding GOB data:", err)
@@ -49,6 +49,22 @@ func HandleRwGob(rw *bufio.ReadWriter) types.Request {
 	fmt.Printf("Data received: \n%#v\n", data)
 
 	return data
+}
+
+func DecodeGob(message []byte) types.Request{
+	var network bytes.Buffer
+	network.Write(message)
+	var request types.Request
+
+	dec := gob.NewDecoder(&network)
+
+	err := dec.Decode(&request)
+
+	if err != nil {
+		fmt.Println("Error decoding GOB data:", err)
+	}
+
+	return request
 }
 
 func HandleGob(conn net.Conn) types.Request {
