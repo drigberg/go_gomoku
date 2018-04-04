@@ -42,7 +42,8 @@ func HandleRequest(req types.Request, client *types.Client) {
 
         response := types.Request{
             GameId: gameId,
-			Action: constants.SUCCESS,
+            Action: constants.CREATE,
+            Success: true,
 		}
 
 		message, err := util.GobToBytes(response)

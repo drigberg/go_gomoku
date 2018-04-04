@@ -2,7 +2,6 @@ package types
 
 import (
     "net"
-    "fmt"
 )
 
 type Client struct {
@@ -11,7 +10,7 @@ type Client struct {
 }
 
 
-func (client *Client) Receive() {
+func (client *Client) Receive(handler func([]byte)) {
 	for {
         message := make([]byte, 4096)
         length, err := client.Socket.Read(message)
@@ -21,7 +20,7 @@ func (client *Client) Receive() {
         }
         if length > 0 {
             // switch
-                fmt.Println("CLIENT RECEIVED: " + string(message))
+            handler(message)
         }
 	}
 }
@@ -44,5 +43,6 @@ type Request struct {
     GameId int
     UserId int
     Action string
+    Success bool
     Data string
 }

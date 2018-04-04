@@ -49,15 +49,6 @@ func CreateGame() {
 	}
 
 	SendToServer(request)
-
-	// result := util.HandleRwGob(rw)
-	// if result.Action == constants.SUCCESS {
-	// 	fmt.Println("Created game #", result.GameId)
-	// 	gameId = result.GameId
-	// 	yourTurn = true
-	// } else {
-	// 	fmt.Println("Error! Could not create game.")
-	// }
 }
 
 func JoinGame(gameIdStr string) {
@@ -130,6 +121,23 @@ func ListenForInput() {
 	}
 }
 
+func Handler(message []byte) {
+	request := util.DecodeGob(message)
+	fmt.Println("Decoded...")
+	fmt.Println(request)
+
+	switch action := request.Action; action {
+	case constants.CREATE:
+		if request.Success {
+			fmt.Println("Created game #", request.GameId)
+			gameId = request.GameId
+			yourTurn = true
+		} else {
+			fmt.Println("Error! Could not create game.")
+		}
+	}
+}
+
 
 func Run(serverPort string) {
 	// create addresses
@@ -143,6 +151,6 @@ func Run(serverPort string) {
 
 	client := &types.Client{Socket: connection}
 
-	go client.Receive()
+	go client.Receive(Handler)
 	ListenForInput()
 }
