@@ -9,7 +9,7 @@ import (
 )
 
 var (
-    games map[int]types.GameRoom
+    games map[int]*types.GameRoom
     gameId = 0
 )
 
@@ -23,7 +23,7 @@ func CreateGame(req types.Request, client *types.Client) int {
 
     players := [2]types.Player{player}
 
-    games[gameId] = types.GameRoom{
+    games[gameId] = &types.GameRoom{
         Id: gameId,
         Players: players,
         Messages: [6]string{},
@@ -61,7 +61,6 @@ func HandleRequest(req types.Request, client *types.Client) {
         }
     case constants.JOIN:
         fmt.Println("JOINING")
-        game := games[req.GameId]
 
         player := types.Player{
             UserId: req.UserId,
@@ -69,17 +68,9 @@ func HandleRequest(req types.Request, client *types.Client) {
             Client: client,
         }
 
-        fmt.Println(player)
-
-        game.Players[1] = player
-
-        fmt.Println(game.Players)
-        fmt.Println(game.Players[1])
-        fmt.Println(games[req.GameId])
-
-
-        game.Messages[0] = "Let the game begin!"
-        game.Turn = 1
+        games[req.GameId].Players[1] = player
+        games[req.GameId].Messages[0] = "Let the game begin!"
+        games[req.GameId].Turn = 1
 
         response := types.Request{
             GameId: req.GameId,
@@ -99,33 +90,34 @@ func HandleRequest(req types.Request, client *types.Client) {
         default:
             close(client.Data)
         }
-    // case constants.MESSAGE:
-    //     response := types.Request{
-	// 		Action: constants.MESSAGE,
-    //         Data: req.Data,
-    //     }
+    case constants.MESSAGE:
+        response := types.Request{
+			Action: constants.MESSAGE,
+            Data: req.Data,
+            Success: true,
+        }
 
-    //     game := games[req.GameId]
+        otherClient := games[req.GameId].Players[0].Client
+        fmt.Println(games[req.GameId].Players[0].UserId, games[req.GameId].Players[1].UserId, req.UserId)
+        if games[req.GameId].Players[0].UserId == req.UserId {
+            otherClient = games[req.GameId].Players[1].Client
+        }
 
-    //     otherPlayerRW := game.Channels[1]
+        fmt.Println("\n\n BOTH PLAYERS:")
+        fmt.Println(games[req.GameId].Players)
 
-	// 	data, err := util.GobToBytes(response)
+		data, err := util.GobToBytes(response)
 
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return
-	// 	}
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-    //     _, err = otherPlayerRW.Write(data)
-    //     util.CheckError(err)
-
-    //     err = otherPlayerRW.Flush()
-    //     if err != nil {
-    //         fmt.Println("Flush failed!")
-    //     }
-
-    //     _, err = rw.Write(data)
-    //     util.CheckError(err)
+        select {
+        case otherClient.Data <- data:
+        default:
+            close(otherClient.Data)
+        }
     default:
         fmt.Println("Unrecognized action!")
     }
@@ -204,7 +196,7 @@ func (manager *ClientManager) start() {
 
 func Run(port string) {
     fmt.Println("Starting server...")
-    games = make(map[int]types.GameRoom)
+    games = make(map[int]*types.GameRoom)
 
     listener, error := net.Listen("tcp", port)
 

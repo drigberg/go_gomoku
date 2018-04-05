@@ -39,14 +39,14 @@ type GameRoom struct {
 
 type Request struct {
     GameId int
-    UserId int
+    UserId string
     Action string
     Success bool
     Data string
 }
 
 type Player struct {
-    UserId int
+    UserId string
     Spots map[int][]Coord
     Client *Client
     Color string

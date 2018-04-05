@@ -8,6 +8,7 @@ import (
 	"os"
 	"fmt"
 	"strconv"
+	"github.com/google/uuid"
 	"go_gomoku/util"
 	"go_gomoku/types"
 	"go_gomoku/constants"
@@ -16,6 +17,7 @@ import (
 var (
 	scanner = bufio.NewScanner(os.Stdin)
 	gameId = 0
+	userId string
 	connection net.Conn
 	yourTurn = false
 )
@@ -44,7 +46,7 @@ func CreateGame() {
 	}
 
 	request := types.Request{
-		UserId: 1,
+		UserId: userId,
 		Action: constants.CREATE,
 	}
 
@@ -61,7 +63,7 @@ func JoinGame(gameIdStr string) {
 
 	request := types.Request{
 		GameId: gameId,
-		UserId: 2,
+		UserId: userId,
 		Action: constants.JOIN,
 	}
 
@@ -77,7 +79,7 @@ func SendMessage(text string) {
 
 	request := types.Request{
 		GameId: gameId,
-		UserId: 1,
+		UserId: userId,
 		Action: constants.MESSAGE,
 		Data: text,
 	}
@@ -134,11 +136,18 @@ func ListenForInput() {
 
 func Run(serverPort string) {
 	// create addresses
-
-	conn, error := net.Dial("tcp", "localhost" + serverPort)
-	if error != nil {
-			fmt.Println(error)
+	uuid, err := uuid.NewUUID()
+	if err != nil {
+		fmt.Println(err)
 	}
+	userId = uuid.String()
+
+	conn, err := net.Dial("tcp", "localhost" + serverPort)
+	if err != nil {
+			fmt.Println(err)
+	}
+
+
 
 	connection = conn
 
