@@ -32,9 +32,7 @@ type Coord struct {
 
 type GameRoom struct {
     Id int
-    Clients [2]*Client
-    Spots map[int][]Coord
-    Players [2]int
+    Players [2]Player
     Messages [6]string
     Turn int
 }
@@ -45,4 +43,11 @@ type Request struct {
     Action string
     Success bool
     Data string
+}
+
+type Player struct {
+    UserId int
+    Spots map[int][]Coord
+    Client *Client
+    Color string
 }

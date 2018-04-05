@@ -67,14 +67,6 @@ func JoinGame(gameIdStr string) {
 
 	SendToServer(request)
 
-	// result := util.HandleRwGob(rw)
-
-	// if result.Action == constants.SUCCESS {
-	// 	fmt.Println("Joined game #", result.GameId)
-	// 	gameId = result.GameId
-	// } else {
-	// 	fmt.Println("Error! Could not create game.")
-	// }
 }
 
 func SendMessage(text string) {
@@ -91,15 +83,34 @@ func SendMessage(text string) {
 	}
 
 	SendToServer(request)
+}
 
-	// result := util.HandleRwGob(rw)
+func Handler(message []byte) {
+	request := util.DecodeGob(message)
+	fmt.Println("Decoded...")
+	fmt.Println(request)
 
-	// fmt.Print(result)
-	// fmt.Println(result.Data)
+	switch action := request.Action; action {
+	case constants.CREATE:
+		if request.Success {
+			fmt.Println("Created game #", request.GameId)
+			gameId = request.GameId
+			yourTurn = true
+		} else {
+			fmt.Println("Error! Could not create game.")
+		}
+	case constants.JOIN:
+			if request.Success {
+				fmt.Println("Joined game #", request.GameId)
+				gameId = request.GameId
+			} else {
+				fmt.Println("Error! Could not join game.")
+			}
+	}
 }
 
 func ListenForInput() {
-    for scanner.Scan() {
+	for scanner.Scan() {
 		text := scanner.Text()
 
 		switch action := text[:2]; action {
@@ -120,24 +131,6 @@ func ListenForInput() {
 		}
 	}
 }
-
-func Handler(message []byte) {
-	request := util.DecodeGob(message)
-	fmt.Println("Decoded...")
-	fmt.Println(request)
-
-	switch action := request.Action; action {
-	case constants.CREATE:
-		if request.Success {
-			fmt.Println("Created game #", request.GameId)
-			gameId = request.GameId
-			yourTurn = true
-		} else {
-			fmt.Println("Error! Could not create game.")
-		}
-	}
-}
-
 
 func Run(serverPort string) {
 	// create addresses

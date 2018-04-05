@@ -15,25 +15,26 @@ var (
 
 func CreateGame(req types.Request, client *types.Client) int {
     gameId += 1
-    players := [2]int{req.UserId, -1}
-    clients := [2]*types.Client{client}
+    player := types.Player{
+        UserId: req.UserId,
+        Spots: make(map[int][]types.Coord),
+        Client: client,
+    }
 
-    spots := make(map[int][]types.Coord)
-    spots[req.UserId] = []types.Coord{}
+    players := [2]types.Player{player}
 
     games[gameId] = types.GameRoom{
         Id: gameId,
-        Clients: clients,
-        Spots: spots,
         Players: players,
         Messages: [6]string{},
+        Turn: 0,
     }
 
     return gameId
 }
 
 func HandleRequest(req types.Request, client *types.Client) {
-    fmt.Println("Received!")
+    fmt.Println("Received!", client)
     fmt.Println(req)
 
     switch action := req.Action; action {
@@ -46,7 +47,7 @@ func HandleRequest(req types.Request, client *types.Client) {
             Success: true,
 		}
 
-		message, err := util.GobToBytes(response)
+		data, err := util.GobToBytes(response)
 
 		if err != nil {
 			fmt.Println(err)
@@ -54,39 +55,54 @@ func HandleRequest(req types.Request, client *types.Client) {
 		}
 
         select {
-        case client.Data <- message:
+        case client.Data <- data:
         default:
             close(client.Data)
         }
+    case constants.JOIN:
+        fmt.Println("JOINING")
+        game := games[req.GameId]
 
-    // case constants.JOIN:
-    //     game := games[req.GameId]
+        player := types.Player{
+            UserId: req.UserId,
+            Spots: make(map[int][]types.Coord),
+            Client: client,
+        }
 
-    //     game.Players[1] = req.UserId
-    //     game.Spots[req.UserId] = []types.Coord{}
-    //     game.Messages[0] = "Let the game begin!"
-    //     game.Turn = 1
+        fmt.Println(player)
 
-    //     response := types.Request{
-    //         GameId: req.GameId,
-	// 		Action: constants.SUCCESS,
-	// 	}
+        game.Players[1] = player
 
-	// 	data, err := util.GobToBytes(response)
+        fmt.Println(game.Players)
+        fmt.Println(game.Players[1])
+        fmt.Println(games[req.GameId])
 
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return
-	// 	}
 
-    //     _, err = rw.Write(data)
-    //     util.CheckError(err)
+        game.Messages[0] = "Let the game begin!"
+        game.Turn = 1
 
-    //     // choose random player to go first
+        response := types.Request{
+            GameId: req.GameId,
+            Action: constants.JOIN,
+            Success: true,
+		}
+
+		data, err := util.GobToBytes(response)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+        select {
+        case client.Data <- data:
+        default:
+            close(client.Data)
+        }
     // case constants.MESSAGE:
     //     response := types.Request{
 	// 		Action: constants.MESSAGE,
-	// 		Data: req.Data,
+    //         Data: req.Data,
     //     }
 
     //     game := games[req.GameId]
