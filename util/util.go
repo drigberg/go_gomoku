@@ -8,7 +8,22 @@ import (
 	"encoding/gob"
 	"go_gomoku/types"
 	"bufio"
+	"runtime"
 )
+
+var (
+	Clear map[string]func()
+)
+
+func CallClear() {
+	function, ok := Clear[runtime.GOOS]
+	if ok {
+		fmt.Print(ok)
+			function()
+	} else {
+			panic("Your platform is unsupported! Can't clear the terminal screen.")
+	}
+}
 
 func CheckError(err error) {
     if err != nil {

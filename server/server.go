@@ -92,6 +92,7 @@ func HandleRequest(req types.Request, client *types.Client) {
         }
     case constants.MESSAGE:
         response := types.Request{
+            GameId: req.GameId,
 			Action: constants.MESSAGE,
             Data: req.Data,
             Success: true,

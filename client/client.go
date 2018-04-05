@@ -22,6 +22,10 @@ var (
 	yourTurn = false
 )
 
+func RefreshScreen() {
+	util.CallClear()
+}
+
 // Send request struct to server as byte array
 func SendToServer(request types.Request) {
 	fmt.Println("Sending to server...")
@@ -88,6 +92,8 @@ func SendMessage(text string) {
 }
 
 func Handler(message []byte) {
+	RefreshScreen()
+
 	request := util.DecodeGob(message)
 	fmt.Println("Decoded...")
 	fmt.Println(request)
