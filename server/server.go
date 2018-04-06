@@ -59,6 +59,7 @@ func HandleRequest(req types.Request, client *types.Client) {
             close(client.Data)
         }
     case constants.JOIN:
+        // TODO: validate that game is still active and original client channel is open
         player := types.Player{
             UserId: req.UserId,
             Spots: make(map[types.Coord]bool),
