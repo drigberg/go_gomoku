@@ -32,6 +32,21 @@ func CreateGame(req types.Request, client *types.Client) int {
     return gameId
 }
 
+func SendToClient(request types.Request, client *types.Client) {
+    data, err := util.GobToBytes(request)
+
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    select {
+    case client.Data <- data:
+    default:
+        close(client.Data)
+    }
+}
+
 func HandleRequest(req types.Request, client *types.Client) {
     fmt.Println("Received!", client)
     fmt.Println(req)
@@ -46,20 +61,35 @@ func HandleRequest(req types.Request, client *types.Client) {
             Success: true,
 		}
 
-		data, err := util.GobToBytes(response)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-        select {
-        case client.Data <- data:
-        default:
-            close(client.Data)
-        }
+		SendToClient(response, client)
     case constants.JOIN:
-        // TODO: validate that game is still active and original client channel is open
+        otherClient := games[req.GameId].Players[0].Client
+        existingPlayer := &games[req.GameId].Players[1]
+
+        if existingPlayer.Client != nil {
+            response := types.Request{
+                GameId: req.GameId,
+                Action: constants.JOIN,
+                Success: false,
+                Data: "Game is full already",
+            }
+
+            SendToClient(response, client)
+            return;
+        }
+
+        if otherClient.Closed {
+            response := types.Request{
+                GameId: req.GameId,
+                Action: constants.JOIN,
+                Success: false,
+                Data: "Other player already left that game",
+            }
+
+            SendToClient(response, client)
+            return;
+        }
+
         player := types.Player{
             UserId: req.UserId,
             Spots: make(map[types.Coord]bool),
@@ -77,18 +107,7 @@ func HandleRequest(req types.Request, client *types.Client) {
             Data: games[req.GameId].Players[0].UserId,
 		}
 
-		data, err := util.GobToBytes(response)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-        select {
-        case client.Data <- data:
-        default:
-            close(client.Data)
-        }
+		SendToClient(response, client)
 
         notification := types.Request{
             GameId: req.GameId,
@@ -98,20 +117,8 @@ func HandleRequest(req types.Request, client *types.Client) {
             Data: games[req.GameId].Players[1].UserId,
 		}
 
-        data, err = util.GobToBytes(notification)
+		SendToClient(notification, otherClient)
 
-        if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-        otherClient := games[req.GameId].Players[0].Client
-
-        select {
-        case otherClient.Data <- data:
-        default:
-            close(otherClient.Data)
-        }
     case constants.MESSAGE:
         response := types.Request{
             GameId: req.GameId,
@@ -126,18 +133,8 @@ func HandleRequest(req types.Request, client *types.Client) {
             otherClient = games[req.GameId].Players[1].Client
         }
 
-		data, err := util.GobToBytes(response)
+		SendToClient(response, otherClient)
 
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-        select {
-        case otherClient.Data <- data:
-        default:
-            close(otherClient.Data)
-        }
     default:
         fmt.Println("Unrecognized action!")
     }
@@ -160,6 +157,7 @@ func (manager *ClientManager) receive(client *types.Client) {
         if err != nil {
             manager.unregister <- client
             client.Socket.Close()
+            client.Closed = true
             break
         }
         if length > 0 {

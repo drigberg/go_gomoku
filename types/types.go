@@ -8,6 +8,7 @@ import (
 type Client struct {
     Socket net.Conn
     Data chan []byte
+    Closed bool
 }
 
 

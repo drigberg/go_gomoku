@@ -151,7 +151,7 @@ func Handler(message []byte) {
 
 				AddMessage("Joined game #" + gameIdStr, "Gomoku")
 			} else {
-				AddMessage("Error! Could not join game.", "Gomoku")
+				AddMessage(request.Data, "Gomoku")
 			}
 	case constants.OTHER_JOINED:
 		if request.Success {
