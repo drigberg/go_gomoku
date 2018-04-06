@@ -23,9 +23,11 @@ var (
 	yourTurn = false
 	messages = []types.Message{}
 	turn = 0
+	board map[string]map[types.Coord]bool
 )
 
 func PrintBoard() {
+	fmt.Println(board)
 	for y := 0; y < 15; y++ {
 		row := ""
 		for x := 0; x < 31; x++ {
@@ -110,9 +112,35 @@ func JoinGame(gameIdStr string) {
 
 }
 
+func MakeMove(text string) {
+	if gameId == 0 {
+		AddMessage("You're not in a game yet!", "Gomoku")
+		return
+	}
+
+	if turn == 0 {
+		AddMessage("The game hasn't started yet!", "Gomoku")
+		return
+	}
+
+	request := types.Request{
+		GameId: gameId,
+		UserId: userId,
+		Action: constants.MOVE,
+		Data: text,
+	}
+
+	SendToServer(request)
+}
+
 func SendMessage(text string) {
 	if gameId == 0 {
 		AddMessage("You're not in a game yet!", "Gomoku")
+		return
+	}
+
+	if turn == 0 {
+		AddMessage("The game hasn't started yet!", "Gomoku")
 		return
 	}
 
@@ -146,7 +174,7 @@ func Handler(message []byte) {
 			if request.Success {
 				gameId = request.GameId
 				gameIdStr := strconv.Itoa(request.GameId)
-				opponentId = request.Data
+				opponentId = request.UserId
 				turn = request.Turn
 
 				AddMessage("Joined game #" + gameIdStr, "Gomoku")
@@ -166,6 +194,20 @@ func Handler(message []byte) {
 		} else {
 			AddMessage("Error! Could not parse message from opponent.", "Gomoku")
 		}
+	case constants.MOVE:
+		if request.Success {
+			turn = request.Turn
+			board = request.Board
+
+			player := "You"
+			if request.UserId == opponentId {
+				player = "Opponent"
+			}
+
+			AddMessage(request.Data, player)
+		} else {
+			AddMessage(request.Data, "Gomoku")
+		}
 	}
 }
 
@@ -175,13 +217,15 @@ func ListenForInput() {
 
 		switch action := text[:2]; action {
 		case "hp":
-			AddMessage("Type mk to make a game; jn <game_id> to join a game; mg <message> to send a message; hp for help", "Gomoku")
+			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <coordinate> to make a move; mg <message> to send a message; hp for help", "Gomoku")
 		case "mk":
 			CreateGame()
 		case "jn":
 			JoinGame(text[3:])
 		case "mg":
 			SendMessage(text[3:])
+		case "mv":
+			MakeMove(text[3:])
 		default:
 			AddMessage("Unrecognized command! Type 'hp' for help!", "Gomoku")
 		}
@@ -205,13 +249,13 @@ func Run(serverPort string) {
 			fmt.Println(err)
 	}
 
-
-
 	connection = conn
 
 	client := &types.Client{Socket: connection}
 
 	go client.Receive(Handler)
+
+	board = make(map[string]map[types.Coord]bool)
 	PrintBoard()
 
 	ListenForInput()

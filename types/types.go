@@ -46,6 +46,16 @@ type GameRoom struct {
     Id int
     Players [2]Player
     Turn int
+    FirstPlayerId string
+}
+
+func (game GameRoom) GetBoard() map[string]map[Coord]bool {
+    board := make(map[string]map[Coord]bool)
+
+    board[game.Players[0].UserId] = game.Players[0].Spots
+    board[game.Players[0].UserId] = game.Players[0].Spots
+
+    return board
 }
 
 type Request struct {

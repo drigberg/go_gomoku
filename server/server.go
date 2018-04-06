@@ -6,6 +6,7 @@ import (
     "go_gomoku/util"
     "go_gomoku/types"
     "go_gomoku/constants"
+    "math/rand"
 )
 
 var (
@@ -45,6 +46,22 @@ func SendToClient(request types.Request, client *types.Client) {
     default:
         close(client.Data)
     }
+}
+
+func IsTurn(gameId int, userId string) bool {
+    if (userId == games[gameId].FirstPlayerId) {
+        return games[gameId].Turn % 2 == 1
+    }
+    return games[gameId].Turn % 2 == 0
+}
+
+func OtherClient(game *types.GameRoom, userId string) *types.Client {
+    otherClient := game.Players[0].Client
+    if game.Players[0].UserId == userId {
+        otherClient = game.Players[1].Client
+    }
+
+    return otherClient
 }
 
 func HandleRequest(req types.Request, client *types.Client) {
@@ -98,13 +115,14 @@ func HandleRequest(req types.Request, client *types.Client) {
 
         games[req.GameId].Players[1] = player
         games[req.GameId].Turn = 1
+        games[req.GameId].FirstPlayerId = games[req.GameId].Players[rand.Intn(2)].UserId
 
         response := types.Request{
             GameId: req.GameId,
+            UserId: games[req.GameId].Players[0].UserId,
             Action: constants.JOIN,
             Success: true,
             Turn: games[req.GameId].Turn,
-            Data: games[req.GameId].Players[0].UserId,
 		}
 
 		SendToClient(response, client)
@@ -114,11 +132,10 @@ func HandleRequest(req types.Request, client *types.Client) {
             Action: constants.OTHER_JOINED,
             Success: true,
             Turn: games[req.GameId].Turn,
-            Data: games[req.GameId].Players[1].UserId,
+            UserId: games[req.GameId].Players[1].UserId,
 		}
 
 		SendToClient(notification, otherClient)
-
     case constants.MESSAGE:
         response := types.Request{
             GameId: req.GameId,
@@ -128,13 +145,43 @@ func HandleRequest(req types.Request, client *types.Client) {
             Success: true,
         }
 
-        otherClient := games[req.GameId].Players[0].Client
-        if games[req.GameId].Players[0].UserId == req.UserId {
-            otherClient = games[req.GameId].Players[1].Client
+        otherClient := OtherClient(games[req.GameId], req.UserId)
+
+        SendToClient(response, otherClient)
+    case constants.MOVE:
+        valid := IsTurn(req.GameId, req.UserId)
+
+        if !valid {
+            errorResponse := types.Request{
+                GameId: req.GameId,
+                UserId: req.UserId,
+                Action: constants.MOVE,
+                Data: "It's not your turn!",
+                Success: false,
+            }
+
+            SendToClient(errorResponse, client)
+            return
+        }
+        board := games[req.GameId].GetBoard()
+        games[req.GameId].Turn += 1
+
+        message := "(played on " + req.Data + " )"
+
+        response := types.Request{
+            GameId: req.GameId,
+            UserId: req.UserId,
+			Action: constants.MOVE,
+            Data: message,
+            Success: true,
+            Turn: games[req.GameId].Turn,
+            Board: board,
         }
 
-		SendToClient(response, otherClient)
+        otherClient := OtherClient(games[req.GameId], req.UserId)
 
+        SendToClient(response, client)
+		SendToClient(response, otherClient)
     default:
         fmt.Println("Unrecognized action!")
     }
