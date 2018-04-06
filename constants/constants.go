@@ -2,6 +2,7 @@ package constants
 
 var (
 	JOIN = "JOIN"
+	OTHER_JOINED = "OTHER_JOINED"
 	CREATE = "CREATE"
 	MESSAGE = "MESSAGE"
 	MOVE = "MOVE"

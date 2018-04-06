@@ -26,7 +26,6 @@ func CreateGame(req types.Request, client *types.Client) int {
     games[gameId] = &types.GameRoom{
         Id: gameId,
         Players: players,
-        Messages: [6]string{},
         Turn: 0,
     }
 
@@ -60,8 +59,6 @@ func HandleRequest(req types.Request, client *types.Client) {
             close(client.Data)
         }
     case constants.JOIN:
-        fmt.Println("JOINING")
-
         player := types.Player{
             UserId: req.UserId,
             Spots: make(map[int][]types.Coord),
@@ -69,13 +66,13 @@ func HandleRequest(req types.Request, client *types.Client) {
         }
 
         games[req.GameId].Players[1] = player
-        games[req.GameId].Messages[0] = "Let the game begin!"
         games[req.GameId].Turn = 1
 
         response := types.Request{
             GameId: req.GameId,
             Action: constants.JOIN,
             Success: true,
+            Turn: games[req.GameId].Turn,
 		}
 
 		data, err := util.GobToBytes(response)
@@ -90,22 +87,41 @@ func HandleRequest(req types.Request, client *types.Client) {
         default:
             close(client.Data)
         }
+
+        notification := types.Request{
+            GameId: req.GameId,
+            Action: constants.OTHER_JOINED,
+            Success: true,
+            Turn: games[req.GameId].Turn,
+		}
+
+        data, err = util.GobToBytes(notification)
+
+        if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+        otherClient := games[req.GameId].Players[0].Client
+
+        select {
+        case otherClient.Data <- data:
+        default:
+            close(otherClient.Data)
+        }
     case constants.MESSAGE:
         response := types.Request{
             GameId: req.GameId,
+            UserId: req.UserId,
 			Action: constants.MESSAGE,
             Data: req.Data,
             Success: true,
         }
 
         otherClient := games[req.GameId].Players[0].Client
-        fmt.Println(games[req.GameId].Players[0].UserId, games[req.GameId].Players[1].UserId, req.UserId)
         if games[req.GameId].Players[0].UserId == req.UserId {
             otherClient = games[req.GameId].Players[1].Client
         }
-
-        fmt.Println("\n\n BOTH PLAYERS:")
-        fmt.Println(games[req.GameId].Players)
 
 		data, err := util.GobToBytes(response)
 
@@ -144,15 +160,8 @@ func (manager *ClientManager) receive(client *types.Client) {
             break
         }
         if length > 0 {
-            // convert to gob
-            //handle
-            fmt.Println("Received...")
-
             request := util.DecodeGob(message)
-            fmt.Println("Decoded...")
-
             HandleRequest(request, client)
-            // manager.broadcast <- message
         }
     }
 }
@@ -225,25 +234,3 @@ func Run(port string) {
         go manager.send(client)
     }
 }
-
-
-// func Run(port string) {
-//     games = make(map[int]types.GameRoom)
-//     tcpAddr, err := net.ResolveTCPAddr("tcp4", port)
-// 	util.CheckError(err)
-
-//     listener, err := net.ListenTCP("tcp", tcpAddr)
-// 	util.CheckError(err)
-
-//     fmt.Println("Listening on " + listener.Addr().String())
-
-//     for {
-// 		conn, err := listener.Accept()
-
-//         if err != nil {
-//             continue
-// 		}
-
-//         go util.AcceptConnection(conn, HandleRequest)
-//     }
-// }

@@ -20,16 +20,23 @@ var (
 	userId string
 	connection net.Conn
 	yourTurn = false
+	messages = []types.Message{}
+	turn = 0
 )
+
+func PrintBoard() {
+
+}
 
 func RefreshScreen() {
 	util.CallClear()
+	for _, message := range(messages) {
+		message.Print()
+	}
 }
 
 // Send request struct to server as byte array
 func SendToServer(request types.Request) {
-	fmt.Println("Sending to server...")
-
 	data, err := util.GobToBytes(request)
 
 	if err != nil {
@@ -37,13 +44,20 @@ func SendToServer(request types.Request) {
 		return
 	}
 
-	fmt.Println("Writing...")
-
 	connection.Write(data) // TODO: get error, handle
 }
 
+func AddMessage(content string, author string) {
+	message := types.Message{
+		Content: content,
+		Author: author,
+	}
+
+	messages = append(messages, message)
+	RefreshScreen()
+}
+
 func CreateGame() {
-	fmt.Println("creating game...")
 	if gameId != 0 {
 		fmt.Println("You're already in a game!")
 		return
@@ -58,10 +72,14 @@ func CreateGame() {
 }
 
 func JoinGame(gameIdStr string) {
+	if gameId != 0 {
+		AddMessage("You're already in a game!!", "Gomoku")
+		return
+	}
+
 	gameId, err := strconv.Atoi(gameIdStr)
-	fmt.Println(gameId, err)
 	if err != nil {
-		fmt.Println("Please enter a valid integer as the game id to join!")
+		AddMessage("Please enter a valid integer as the game id to join!", "Gomoku")
 		return
 	}
 
@@ -77,7 +95,7 @@ func JoinGame(gameIdStr string) {
 
 func SendMessage(text string) {
 	if gameId == 0 {
-		fmt.Println("You're not in a game yet!")
+		AddMessage("You're not in a game yet!", "Gomoku")
 		return
 	}
 
@@ -88,32 +106,46 @@ func SendMessage(text string) {
 		Data: text,
 	}
 
+	AddMessage(request.Data, "You")
 	SendToServer(request)
 }
 
 func Handler(message []byte) {
-	RefreshScreen()
-
 	request := util.DecodeGob(message)
-	fmt.Println("Decoded...")
-	fmt.Println(request)
 
 	switch action := request.Action; action {
 	case constants.CREATE:
 		if request.Success {
-			fmt.Println("Created game #", request.GameId)
+			gameIdStr := strconv.Itoa(request.GameId)
+
+			AddMessage("Created game #" + gameIdStr, "Gomoku")
+
 			gameId = request.GameId
 			yourTurn = true
 		} else {
-			fmt.Println("Error! Could not create game.")
+			AddMessage("Error! Could not create game.", "Gomoku")
 		}
 	case constants.JOIN:
 			if request.Success {
-				fmt.Println("Joined game #", request.GameId)
 				gameId = request.GameId
+				gameIdStr := strconv.Itoa(request.GameId)
+
+				AddMessage("Joined game #" + gameIdStr, "Gomoku")
 			} else {
-				fmt.Println("Error! Could not join game.")
+				AddMessage("Error! Could not join game.", "Gomoku")
 			}
+	case constants.OTHER_JOINED:
+		if request.Success {
+			turn = request.Turn
+
+			AddMessage("Let the game begin!", "Gomoku")
+		}
+	case constants.MESSAGE:
+		if request.Success {
+			AddMessage(request.Data, "Opponent")
+		} else {
+			AddMessage("Error! Could not parse message from opponent.", "Gomoku")
+		}
 	}
 }
 
@@ -123,7 +155,7 @@ func ListenForInput() {
 
 		switch action := text[:2]; action {
 		case "hp":
-			fmt.Println("Type mk to make a game; mg <message> to send a message")
+			AddMessage("Type mk to make a game; jn <game_id> to join a game; mg <message> to send a message; hp for help", "Gomoku")
 		case "mk":
 			CreateGame()
 		case "jn":
@@ -131,7 +163,7 @@ func ListenForInput() {
 		case "mg":
 			SendMessage(text[3:])
 		default:
-			fmt.Println("Unrecognized command! Type 'hp' for help!")
+			AddMessage("Unrecognized command! Type 'hp' for help!", "Gomoku")
 		}
 
 		if scanner.Err() != nil {

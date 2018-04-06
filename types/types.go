@@ -2,6 +2,7 @@ package types
 
 import (
     "net"
+    "fmt"
 )
 
 type Client struct {
@@ -30,10 +31,19 @@ type Coord struct {
     y int
 }
 
+type Message struct {
+    Content string
+    Author string
+}
+
+func (message Message) Print() {
+    output := message.Author + ": " + message.Content
+    fmt.Println(output)
+}
+
 type GameRoom struct {
     Id int
     Players [2]Player
-    Messages [6]string
     Turn int
 }
 
@@ -43,6 +53,7 @@ type Request struct {
     Action string
     Success bool
     Data string
+    Turn int
 }
 
 type Player struct {
