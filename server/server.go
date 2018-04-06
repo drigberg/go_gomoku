@@ -17,7 +17,7 @@ func CreateGame(req types.Request, client *types.Client) int {
     gameId += 1
     player := types.Player{
         UserId: req.UserId,
-        Spots: make(map[int][]types.Coord),
+        Spots: make(map[types.Coord]bool),
         Client: client,
     }
 
@@ -61,7 +61,7 @@ func HandleRequest(req types.Request, client *types.Client) {
     case constants.JOIN:
         player := types.Player{
             UserId: req.UserId,
-            Spots: make(map[int][]types.Coord),
+            Spots: make(map[types.Coord]bool),
             Client: client,
         }
 
@@ -73,6 +73,7 @@ func HandleRequest(req types.Request, client *types.Client) {
             Action: constants.JOIN,
             Success: true,
             Turn: games[req.GameId].Turn,
+            Data: games[req.GameId].Players[0].UserId,
 		}
 
 		data, err := util.GobToBytes(response)
@@ -93,6 +94,7 @@ func HandleRequest(req types.Request, client *types.Client) {
             Action: constants.OTHER_JOINED,
             Success: true,
             Turn: games[req.GameId].Turn,
+            Data: games[req.GameId].Players[1].UserId,
 		}
 
         data, err = util.GobToBytes(notification)

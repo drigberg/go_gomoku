@@ -27,8 +27,8 @@ func (client *Client) Receive(handler func([]byte)) {
 }
 
 type Coord struct {
-    x int
-    y int
+    X int
+    Y int
 }
 
 type Message struct {
@@ -54,11 +54,12 @@ type Request struct {
     Success bool
     Data string
     Turn int
+    Board map[string]map[Coord]bool
 }
 
 type Player struct {
     UserId string
-    Spots map[int][]Coord
+    Spots map[Coord]bool
     Client *Client
     Color string
 }

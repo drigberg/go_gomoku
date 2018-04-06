@@ -18,6 +18,7 @@ var (
 	scanner = bufio.NewScanner(os.Stdin)
 	gameId = 0
 	userId string
+	opponentId string
 	connection net.Conn
 	yourTurn = false
 	messages = []types.Message{}
@@ -25,11 +26,27 @@ var (
 )
 
 func PrintBoard() {
-
+	for y := 0; y < 15; y++ {
+		row := ""
+		for x := 0; x < 31; x++ {
+			if x % 2 == 0 {
+				if y == 0 {
+					row += " "
+				} else {
+					row += "|"
+				}
+			} else {
+				row += "_"
+			}
+		}
+		fmt.Println(row)
+	}
 }
 
 func RefreshScreen() {
 	util.CallClear()
+	fmt.Println("Turn #", strconv.Itoa(turn))
+	PrintBoard()
 	for _, message := range(messages) {
 		message.Print()
 	}
@@ -129,6 +146,8 @@ func Handler(message []byte) {
 			if request.Success {
 				gameId = request.GameId
 				gameIdStr := strconv.Itoa(request.GameId)
+				opponentId = request.Data
+				turn = request.Turn
 
 				AddMessage("Joined game #" + gameIdStr, "Gomoku")
 			} else {
@@ -137,6 +156,7 @@ func Handler(message []byte) {
 	case constants.OTHER_JOINED:
 		if request.Success {
 			turn = request.Turn
+			opponentId = request.Data
 
 			AddMessage("Let the game begin!", "Gomoku")
 		}
@@ -192,5 +212,7 @@ func Run(serverPort string) {
 	client := &types.Client{Socket: connection}
 
 	go client.Receive(Handler)
+	PrintBoard()
+
 	ListenForInput()
 }
