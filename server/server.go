@@ -3,10 +3,13 @@ package server
 import (
     "net"
     "fmt"
+    "strings"
+    "strconv"
+    "math/rand"
     "go_gomoku/util"
     "go_gomoku/types"
     "go_gomoku/constants"
-    "math/rand"
+    "go_gomoku/helpers"
 )
 
 var (
@@ -18,51 +21,70 @@ func CreateGame(req types.Request, client *types.Client) int {
     gameId += 1
     player := types.Player{
         UserId: req.UserId,
-        Spots: make(map[types.Coord]bool),
         Client: client,
     }
 
-    players := [2]types.Player{player}
+    players := make(map[string]*types.Player)
+    
+    players[req.UserId] = &player
 
     games[gameId] = &types.GameRoom{
         Id: gameId,
         Players: players,
         Turn: 0,
+        Board: make(map[string]map[string]bool),
     }
+
+    games[gameId].Board["white"] = make(map[string]bool)
+    games[gameId].Board["black"] = make(map[string]bool)
 
     return gameId
 }
 
-func SendToClient(request types.Request, client *types.Client) {
-    data, err := util.GobToBytes(request)
+func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Request) {
+    coordinates := strings.Split(moveStr, " ")
 
-    if err != nil {
-        fmt.Println(err)
-        return
+    if (len(coordinates) != 2) {
+        errorResponse := types.Request{
+            GameId: req.GameId,
+            UserId: req.UserId,
+            Action: constants.MOVE,
+            Data: "The syntax for this move is mv <x> <y>, <x> <y>, <x> <y>",
+            Success: false,
+        }
+
+        return false, types.Coord{}, errorResponse
     }
 
-    select {
-    case client.Data <- data:
-    default:
-        close(client.Data)
+    x, xErr := strconv.Atoi(coordinates[0])
+    y, yErr := strconv.Atoi(coordinates[1])
+
+    if (xErr != nil || yErr != nil) {
+        errorResponse := types.Request{
+            GameId: req.GameId,
+            UserId: req.UserId,
+            Action: constants.MOVE,
+            Data: "Both x and y must be integers",
+            Success: false,
+        }
+
+        return false, types.Coord{}, errorResponse
     }
+
+    move := types.Coord{
+        X: x,
+        Y: y,
+    }
+
+    ok, errorResponse := helpers.CheckOwnership(games[req.GameId], req.UserId, move)
+    
+    if !ok {
+        return false, types.Coord{}, errorResponse
+    }
+
+    return true, move, types.Request{}
 }
 
-func IsTurn(gameId int, userId string) bool {
-    if (userId == games[gameId].FirstPlayerId) {
-        return games[gameId].Turn % 2 == 1
-    }
-    return games[gameId].Turn % 2 == 0
-}
-
-func OtherClient(game *types.GameRoom, userId string) *types.Client {
-    otherClient := game.Players[0].Client
-    if game.Players[0].UserId == userId {
-        otherClient = game.Players[1].Client
-    }
-
-    return otherClient
-}
 
 func HandleRequest(req types.Request, client *types.Client) {
     fmt.Println("Received!", client)
@@ -78,12 +100,11 @@ func HandleRequest(req types.Request, client *types.Client) {
             Success: true,
 		}
 
-		SendToClient(response, client)
+		helpers.SendToClient(response, client)
     case constants.JOIN:
-        otherClient := games[req.GameId].Players[0].Client
-        existingPlayer := &games[req.GameId].Players[1]
+        otherClient := helpers.OtherClient(games[req.GameId], req.UserId)
 
-        if existingPlayer.Client != nil {
+        if len(games[req.GameId].Players) == 2 {
             response := types.Request{
                 GameId: req.GameId,
                 Action: constants.JOIN,
@@ -91,7 +112,7 @@ func HandleRequest(req types.Request, client *types.Client) {
                 Data: "Game is full already",
             }
 
-            SendToClient(response, client)
+            helpers.SendToClient(response, client)
             return;
         }
 
@@ -103,39 +124,47 @@ func HandleRequest(req types.Request, client *types.Client) {
                 Data: "Other player already left that game",
             }
 
-            SendToClient(response, client)
+            helpers.SendToClient(response, client)
             return;
         }
 
         player := types.Player{
             UserId: req.UserId,
-            Spots: make(map[types.Coord]bool),
             Client: client,
         }
 
-        games[req.GameId].Players[1] = player
+        games[req.GameId].Players[req.UserId] = &player
         games[req.GameId].Turn = 1
-        games[req.GameId].FirstPlayerId = games[req.GameId].Players[rand.Intn(2)].UserId
 
+        games[req.GameId].FirstPlayerId = req.UserId
+
+        opponentId := helpers.GetOpponentId(games[req.GameId], req.UserId)
+        
+        if rand.Intn(2) == 0 {
+            games[req.GameId].FirstPlayerId = opponentId
+        }
+        
         response := types.Request{
             GameId: req.GameId,
-            UserId: games[req.GameId].Players[0].UserId,
+            UserId: opponentId,
             Action: constants.JOIN,
             Success: true,
+            YourTurn: games[req.GameId].FirstPlayerId == req.UserId,
             Turn: games[req.GameId].Turn,
 		}
 
-		SendToClient(response, client)
+		helpers.SendToClient(response, client)
 
         notification := types.Request{
             GameId: req.GameId,
             Action: constants.OTHER_JOINED,
             Success: true,
+            YourTurn: games[req.GameId].FirstPlayerId != req.UserId,
             Turn: games[req.GameId].Turn,
-            UserId: games[req.GameId].Players[1].UserId,
+            UserId: req.UserId,
 		}
 
-		SendToClient(notification, otherClient)
+		helpers.SendToClient(notification, otherClient)
     case constants.MESSAGE:
         response := types.Request{
             GameId: req.GameId,
@@ -145,11 +174,18 @@ func HandleRequest(req types.Request, client *types.Client) {
             Success: true,
         }
 
-        otherClient := OtherClient(games[req.GameId], req.UserId)
+        otherClient := helpers.OtherClient(games[req.GameId], req.UserId)
 
-        SendToClient(response, otherClient)
+        helpers.SendToClient(response, otherClient)
     case constants.MOVE:
-        valid := IsTurn(req.GameId, req.UserId)
+        response := types.Request{
+            GameId: req.GameId,
+            UserId: req.UserId,
+            Action: constants.MOVE,
+        }
+
+        valid := helpers.IsTurn(games[req.GameId], req.UserId)
+        var message string
 
         if !valid {
             errorResponse := types.Request{
@@ -160,28 +196,84 @@ func HandleRequest(req types.Request, client *types.Client) {
                 Success: false,
             }
 
-            SendToClient(errorResponse, client)
+            helpers.SendToClient(errorResponse, client)
             return
         }
-        board := games[req.GameId].GetBoard()
-        games[req.GameId].Turn += 1
 
-        message := "(played on " + req.Data + " )"
+        switch turn := games[req.GameId].Turn; turn {
+        case 1:
+            if games[req.GameId].Turn == 1 {
+                moveStrs := strings.Split(req.Data, ", ")
+                moves := [3]types.Coord{}
+                for i, moveStr := range(moveStrs) {
+                    ok, move, errorResponse := ParseMove(req, moveStr)
+    
+                    if !ok {
+                        helpers.SendToClient(errorResponse, client)
+                        return
+                    }
+    
+                    moves[i] = move
+                }
+    
+                games[req.GameId].PlayMove(moves[0], "black")
+                games[req.GameId].PlayMove(moves[1], "black")
+                games[req.GameId].PlayMove(moves[2], "white")
+                message = "(played black on " + moves[0].String() + ", black on " +  moves[1].String() + ", and white on " +  moves[2].String() + " )"
+            } 
+        case 2:
+            response.Colors = make(map[string]string)
+            opponentId := helpers.GetOpponentId(games[req.GameId], req.UserId)
 
-        response := types.Request{
-            GameId: req.GameId,
-            UserId: req.UserId,
-			Action: constants.MOVE,
-            Data: message,
-            Success: true,
-            Turn: games[req.GameId].Turn,
-            Board: board,
+            if req.Data == "pass" {
+                message = "(passed and is now black -- back to player 1)"
+
+                games[req.GameId].Players[req.UserId].Color = "black"
+                games[req.GameId].Players[opponentId].Color = "white"
+                response.Colors[req.UserId] = "black"
+                response.Colors[opponentId] = "white"
+            } else {
+                ok, move, errorResponse := ParseMove(req, req.Data)
+
+                if !ok {
+                    helpers.SendToClient(errorResponse, client)
+                    return
+                }
+
+                games[req.GameId].Players[req.UserId].Color = "white"
+                games[req.GameId].Players[opponentId].Color = "black"
+                response.Colors[req.UserId] = "white"
+                response.Colors[opponentId] = "black"
+
+                games[req.GameId].PlayMove(move, "white")
+            }
+        default:
+            ok, move, errorResponse := ParseMove(req, req.Data)
+
+            if !ok {
+                helpers.SendToClient(errorResponse, client)
+                return
+            }
+    
+            games[req.GameId].PlayMove(move, games[req.GameId].Players[req.UserId].Color)
+    
+            message = "(played on " + req.Data + " )"
         }
 
-        otherClient := OtherClient(games[req.GameId], req.UserId)
+        games[req.GameId].Turn += 1
 
-        SendToClient(response, client)
-		SendToClient(response, otherClient)
+        response.Data = message
+        response.YourTurn = false
+        response.Success = true
+        response.Turn = games[req.GameId].Turn
+        response.Board = games[req.GameId].Board
+
+        helpers.SendToClient(response, client)
+
+        otherClient := helpers.OtherClient(games[req.GameId], req.UserId)
+        response.YourTurn = true
+        helpers.SendToClient(response, otherClient)
+
     default:
         fmt.Println("Unrecognized action!")
     }

@@ -19,26 +19,40 @@ var (
 	gameId = 0
 	userId string
 	opponentId string
+	yourColor string
+	opponentColor string
 	connection net.Conn
 	yourTurn = false
 	messages = []types.Message{}
 	turn = 0
-	board map[string]map[types.Coord]bool
+	board map[string]map[string]bool
+	colors map[string]string
+	turnOneInstructions = "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
+	turnTwoInstructions = "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 )
 
 func PrintBoard() {
-	fmt.Println(board)
 	for y := 0; y < 15; y++ {
 		row := ""
-		for x := 0; x < 31; x++ {
-			if x % 2 == 0 {
-				if y == 0 {
-					row += " "
-				} else {
-					row += "|"
-				}
+		for x := 0; x < 16; x++ {
+			coord := types.Coord {
+				X: x + 1,
+				Y: y,
+			}
+
+			if y == 0 {
+				row += " "
 			} else {
-				row += "_"
+				row += "|"
+			}
+
+			if (x != 15) {
+				color := util.IsTakenBy(board, coord)
+				if color == constants.FREE {
+					row += "_"
+				} else {
+					row += colors[color]
+				}
 			}
 		}
 		fmt.Println(row)
@@ -47,7 +61,22 @@ func PrintBoard() {
 
 func RefreshScreen() {
 	util.CallClear()
-	fmt.Println("Turn #", strconv.Itoa(turn))
+
+	var turnStr string 
+
+	if (turn > 0) {
+		turnStr = "Turn #" + strconv.Itoa(turn)
+		if (yourTurn) {
+			turnStr += ": You"
+		} else {
+			turnStr += ": Opponent"
+		}
+	} else {
+		turnStr = "Waiting for player to join..."
+	}
+
+
+	fmt.Println(turnStr)
 	PrintBoard()
 	for _, message := range(messages) {
 		message.Print()
@@ -176,17 +205,23 @@ func Handler(message []byte) {
 				gameIdStr := strconv.Itoa(request.GameId)
 				opponentId = request.UserId
 				turn = request.Turn
+				yourTurn = request.YourTurn
 
 				AddMessage("Joined game #" + gameIdStr, "Gomoku")
+				AddMessage(turnOneInstructions, "Gomoku")
 			} else {
 				AddMessage(request.Data, "Gomoku")
 			}
 	case constants.OTHER_JOINED:
 		if request.Success {
 			turn = request.Turn
-			opponentId = request.Data
+			opponentId = request.UserId
 
+			yourTurn = request.YourTurn
 			AddMessage("Let the game begin!", "Gomoku")
+			if yourTurn {
+				AddMessage(turnOneInstructions, "Gomoku")
+			}
 		}
 	case constants.MESSAGE:
 		if request.Success {
@@ -196,6 +231,15 @@ func Handler(message []byte) {
 		}
 	case constants.MOVE:
 		if request.Success {
+			if turn == 2 {
+				yourColor = request.Colors[userId]
+				if yourColor == "white" {
+					opponentColor = "black"
+				} else {
+					opponentColor = "white"
+				}
+			}
+
 			turn = request.Turn
 			board = request.Board
 
@@ -204,7 +248,12 @@ func Handler(message []byte) {
 				player = "Opponent"
 			}
 
+			yourTurn = request.YourTurn
 			AddMessage(request.Data, player)
+
+			if yourTurn && turn == 2 {
+				AddMessage(turnTwoInstructions, "Gomoku")
+			}
 		} else {
 			AddMessage(request.Data, "Gomoku")
 		}
@@ -217,7 +266,7 @@ func ListenForInput() {
 
 		switch action := text[:2]; action {
 		case "hp":
-			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <coordinate> to make a move; mg <message> to send a message; hp for help", "Gomoku")
+			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", "Gomoku")
 		case "mk":
 			CreateGame()
 		case "jn":
@@ -237,6 +286,10 @@ func ListenForInput() {
 }
 
 func Run(serverPort string) {
+	colors = make(map[string]string)
+	colors["white"] = "\u25CF"
+	colors["black"] = "\u25CB"
+
 	// create addresses
 	uuid, err := uuid.NewUUID()
 	if err != nil {
@@ -255,7 +308,7 @@ func Run(serverPort string) {
 
 	go client.Receive(Handler)
 
-	board = make(map[string]map[types.Coord]bool)
+	board = make(map[string]map[string]bool)
 	PrintBoard()
 
 	ListenForInput()

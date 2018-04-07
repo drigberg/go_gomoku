@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"bytes"
+	"runtime"
 	"encoding/gob"
 	"go_gomoku/types"
-	"runtime"
+	"go_gomoku/constants"
 )
 
 var (
@@ -54,4 +55,16 @@ func GobToBytes(key interface{}) ([]byte, error) {
         return nil, err
     }
     return buf.Bytes(), nil
+}
+
+func IsTakenBy(board map[string]map[string]bool, move types.Coord) string {
+	spotStr := move.String()
+	    
+    for color := range board {
+        if board[color][spotStr] {
+            return color
+        }
+    }
+    
+    return constants.FREE
 }

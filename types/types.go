@@ -3,6 +3,7 @@ package types
 import (
     "net"
     "fmt"
+    "strconv"
 )
 
 type Client struct {
@@ -32,6 +33,10 @@ type Coord struct {
     Y int
 }
 
+func (coord Coord) String() string {
+    return strconv.Itoa(coord.X) + " " + strconv.Itoa(coord.Y)
+}
+
 type Message struct {
     Content string
     Author string
@@ -44,18 +49,16 @@ func (message Message) Print() {
 
 type GameRoom struct {
     Id int
-    Players [2]Player
+    Players map[string]*Player
     Turn int
+    Board map[string]map[string]bool
     FirstPlayerId string
 }
 
-func (game GameRoom) GetBoard() map[string]map[Coord]bool {
-    board := make(map[string]map[Coord]bool)
+func (game GameRoom) PlayMove(move Coord, color string) {
+    moveStr := move.String()
 
-    board[game.Players[0].UserId] = game.Players[0].Spots
-    board[game.Players[0].UserId] = game.Players[0].Spots
-
-    return board
+    game.Board[color][moveStr] = true
 }
 
 type Request struct {
@@ -63,14 +66,15 @@ type Request struct {
     UserId string
     Action string
     Success bool
+    Colors map[string]string
     Data string
+    YourTurn bool
     Turn int
-    Board map[string]map[Coord]bool
+    Board map[string]map[string]bool
 }
 
 type Player struct {
     UserId string
-    Spots map[Coord]bool
     Client *Client
     Color string
 }

@@ -1,6 +1,7 @@
 package constants
 
 var (
+	FREE = "FREE"
 	MOVE = "MOVE"
 	JOIN = "JOIN"
 	OTHER_JOINED = "OTHER_JOINED"
