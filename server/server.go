@@ -59,12 +59,15 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
     x, xErr := strconv.Atoi(coordinates[0])
     y, yErr := strconv.Atoi(coordinates[1])
 
-    if (xErr != nil || yErr != nil) {
+    isNil := xErr != nil || yErr != nil
+    notInRange := x < 1 || x > 15 || y < 1 || y > 15
+
+    if isNil || notInRange {
         errorResponse := types.Request{
             GameId: req.GameId,
             UserId: req.UserId,
             Action: constants.MOVE,
-            Data: "Both x and y must be integers",
+            Data: "Both x and y must be integers from 1 to 15",
             Success: false,
         }
 
@@ -185,6 +188,7 @@ func HandleRequest(req types.Request, client *types.Client) {
         }
 
         valid := helpers.IsTurn(games[req.GameId], req.UserId)
+        gameOver := false
         var message string
 
         if !valid {
@@ -204,6 +208,19 @@ func HandleRequest(req types.Request, client *types.Client) {
         case 1:
             if games[req.GameId].Turn == 1 {
                 moveStrs := strings.Split(req.Data, ", ")
+                if len(moveStrs) != 3 {
+                    errorResponse := types.Request{
+                        GameId: req.GameId,
+                        UserId: req.UserId,
+                        Action: constants.MOVE,
+                        Data: "Please choose exectly three sets of two values",
+                        Success: false,
+                    }
+
+                    helpers.SendToClient(errorResponse, client)
+                    return
+                }
+
                 moves := [3]types.Coord{}
                 for i, moveStr := range(moveStrs) {
                     ok, move, errorResponse := ParseMove(req, moveStr)
@@ -256,17 +273,27 @@ func HandleRequest(req types.Request, client *types.Client) {
             }
     
             games[req.GameId].PlayMove(move, games[req.GameId].Players[req.UserId].Color)
-    
-            message = "(played on " + req.Data + " )"
+
+            gameOver = helpers.CheckForWin(games[req.GameId], move, games[req.GameId].Players[req.UserId].Color)
+            if (gameOver) {
+                games[req.GameId].IsOver = true
+                response.GameOver = true
+                message = "won!!!! (" + req.Data + " )"
+            } else {
+                message = "(played on " + req.Data + " )"
+            }
         }
 
-        games[req.GameId].Turn += 1
-
-        response.Data = message
-        response.YourTurn = false
         response.Success = true
-        response.Turn = games[req.GameId].Turn
         response.Board = games[req.GameId].Board
+        response.Data = message
+
+        if !gameOver {
+            games[req.GameId].Turn += 1
+
+            response.YourTurn = false
+            response.Turn = games[req.GameId].Turn
+        }
 
         helpers.SendToClient(response, client)
 

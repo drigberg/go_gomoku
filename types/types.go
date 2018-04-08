@@ -53,6 +53,7 @@ type GameRoom struct {
     Turn int
     Board map[string]map[string]bool
     FirstPlayerId string
+    IsOver bool
 }
 
 func (game GameRoom) PlayMove(move Coord, color string) {
@@ -66,6 +67,7 @@ type Request struct {
     UserId string
     Action string
     Success bool
+    GameOver bool
     Colors map[string]string
     Data string
     YourTurn bool

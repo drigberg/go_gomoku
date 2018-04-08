@@ -2,11 +2,16 @@ package helpers
 
 import (
 	"fmt"
+	"strings"
+	"strconv"
 	"go_gomoku/types"
 	"go_gomoku/util"
 	"go_gomoku/constants"
 )
 
+var (
+	axes = [4][2]int{[2]int{-1, -1}, [2]int{-1, 0}, [2]int{-1, 1}, [2]int{0, -1}}
+)
 func CheckOwnership(game *types.GameRoom, userId string, move types.Coord) (bool, types.Request) {
 	if util.IsTakenBy(game.Board, move) != constants.FREE {
 			errorResponse := types.Request{
@@ -21,6 +26,47 @@ func CheckOwnership(game *types.GameRoom, userId string, move types.Coord) (bool
 	}
 
 	return true, types.Request{}
+}
+
+func CheckAlongAxis(spots map[string]bool, axis [2]int, move types.Coord, num int) int {
+	next := types.Coord{
+		X: move.X + axis[0],
+		Y: move.Y + axis[1],
+	}
+
+	for c := range(spots) {
+		coordinates := strings.Split(c, " ")
+		x, _ := strconv.Atoi(coordinates[0])
+		y, _ := strconv.Atoi(coordinates[1])
+		
+		if x == next.X && y == next.Y {
+			return CheckAlongAxis(spots, axis, next, num + 1)
+		}
+	}
+
+	return num
+}
+
+func CheckForWin(game *types.GameRoom, move types.Coord, color string) (bool) {
+	// check within color from move coordinates
+	spots := game.Board[color]
+
+	for _, axis := range(axes) {
+		fmt.Println("\n")
+
+		len := CheckAlongAxis(spots, axis, move, 1)
+		fmt.Println(len)
+		complement := [2]int{axis[0] * -1, axis[1] * -1}
+		len = CheckAlongAxis(spots, complement, move, len)
+		fmt.Println(len)
+
+
+		if len == 5 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func GetOpponentId(game *types.GameRoom, userId string) string {

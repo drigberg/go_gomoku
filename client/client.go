@@ -21,6 +21,7 @@ var (
 	opponentId string
 	yourColor string
 	opponentColor string
+	gameOver = false
 	connection net.Conn
 	yourTurn = false
 	messages = []types.Message{}
@@ -72,7 +73,11 @@ func RefreshScreen() {
 			turnStr += ": Opponent"
 		}
 	} else {
-		turnStr = "Waiting for player to join..."
+		if gameOver {
+			turnStr = "Game over!"
+		} else {
+			turnStr = "Waiting for player to join..."
+		}
 	}
 
 
@@ -190,6 +195,7 @@ func Handler(message []byte) {
 	switch action := request.Action; action {
 	case constants.CREATE:
 		if request.Success {
+			gameOver = false
 			gameIdStr := strconv.Itoa(request.GameId)
 
 			AddMessage("Created game #" + gameIdStr, "Gomoku")
@@ -201,6 +207,7 @@ func Handler(message []byte) {
 		}
 	case constants.JOIN:
 			if request.Success {
+				gameOver = false
 				gameId = request.GameId
 				gameIdStr := strconv.Itoa(request.GameId)
 				opponentId = request.UserId
@@ -248,7 +255,9 @@ func Handler(message []byte) {
 				player = "Opponent"
 			}
 
+			gameOver = request.GameOver
 			yourTurn = request.YourTurn
+
 			AddMessage(request.Data, player)
 
 			if yourTurn && turn == 2 {
@@ -270,10 +279,25 @@ func ListenForInput() {
 		case "mk":
 			CreateGame()
 		case "jn":
+			if len(text) < 4 {
+				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				continue
+			}
+
 			JoinGame(text[3:])
 		case "mg":
+			if len(text) < 4 {
+				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				continue
+			}
+
 			SendMessage(text[3:])
 		case "mv":
+			if len(text) < 4 {
+				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				continue
+			}
+
 			MakeMove(text[3:])
 		default:
 			AddMessage("Unrecognized command! Type 'hp' for help!", "Gomoku")
