@@ -62,6 +62,11 @@ func (game GameRoom) PlayMove(move Coord, color string) {
     game.Board[color][moveStr] = true
 }
 
+type OpenRoom struct {
+    Id int
+    UserId string
+}
+
 type Request struct {
     GameId int
     UserId string
@@ -73,6 +78,7 @@ type Request struct {
     YourTurn bool
     Turn int
     Board map[string]map[string]bool
+    Home []OpenRoom
 }
 
 type Player struct {

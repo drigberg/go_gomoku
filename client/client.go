@@ -236,6 +236,22 @@ func Handler(message []byte) {
 		} else {
 			AddMessage("Error! Could not parse message from opponent.", "Gomoku")
 		}
+	case constants.HOME:
+		util.CallClear()
+		fmt.Println("WELCOME TO GOMOKU!")
+		if len(request.Home) == 0 {
+			fmt.Println("No open games! Type 'mk' to make a new game!")
+		} else {
+			fmt.Println("Open Games")
+			fmt.Println("_________")
+	
+	
+			for _, game := range(request.Home) {
+				fmt.Println("Game Id: " + strconv.Itoa(game.Id) + " ----- User: " + game.UserId)
+			}
+		}
+
+
 	case constants.MOVE:
 		if request.Success {
 			if turn == 2 {
@@ -333,7 +349,6 @@ func Run(serverPort string) {
 	go client.Receive(Handler)
 
 	board = make(map[string]map[string]bool)
-	PrintBoard()
 
 	ListenForInput()
 }

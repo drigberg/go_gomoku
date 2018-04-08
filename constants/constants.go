@@ -1,6 +1,7 @@
 package constants
 
 var (
+	HOME = "HOME"
 	FREE = "FREE"
 	MOVE = "MOVE"
 	JOIN = "JOIN"

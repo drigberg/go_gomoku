@@ -309,6 +309,34 @@ func HandleRequest(req types.Request, client *types.Client) {
     fmt.Println("\n")
 }
 
+func sendHome(client *types.Client) {
+    home := []types.OpenRoom{}
+
+    for _, game := range(games) {
+        if !game.IsOver && len(game.Players) == 1 {
+            var userId string
+            for id := range(game.Players) {
+                userId = id
+            }
+
+
+            openRoom := types.OpenRoom{
+                Id: game.Id,
+                UserId: userId,
+            }
+
+            home = append(home, openRoom)
+        }
+    }
+
+    data := types.Request{
+        Action: constants.HOME,
+        Home: home,
+    }
+
+    helpers.SendToClient(data, client)
+}
+
 type ClientManager struct {
     clients map[*types.Client]bool
     broadcast chan []byte
@@ -399,5 +427,7 @@ func Run(port string) {
         manager.register <- client
         go manager.receive(client)
         go manager.send(client)
+
+        sendHome(client)
     }
 }
