@@ -1,4 +1,6 @@
 .env
+go_gomoku
+
 # OSX
 .DS_Store
 # Binaries for programs and plugins

@@ -259,8 +259,8 @@ func Handler(message []byte) {
 			fmt.Println("No open games! Type 'mk' to make a new game!")
 		} else {
 			fmt.Println("Open Games")
+			fmt.Println("(type hm to refresh)")
 			fmt.Println("_________")
-
 
 			for _, game := range(request.Home) {
 				fmt.Println("Game Id: " + strconv.Itoa(game.Id) + " ----- User: " + game.UserId)
@@ -355,10 +355,11 @@ func ListenForInput() {
 
 			MakeMove(text[3:])
 		case "hm":
-			if gameOver {
+			if gameOver || gameId == 0 {
 				BackToHome()
 				continue
 			} 
+
 			goingHome = true
 			AddMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
 		default:
