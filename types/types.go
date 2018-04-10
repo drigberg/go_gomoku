@@ -4,12 +4,14 @@ import (
     "net"
     "fmt"
     "strconv"
+    "sync"
 )
 
 type Client struct {
     Socket net.Conn
     Data chan []byte
     Closed bool
+    M sync.Mutex
 }
 
 

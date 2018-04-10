@@ -10,7 +10,9 @@ import (
     "go_gomoku/types"
     "go_gomoku/constants"
     "go_gomoku/helpers"
+    // "go_gomoku/db"
 )
+
 
 var (
     games map[int]*types.GameRoom
@@ -25,7 +27,7 @@ func CreateGame(req types.Request, client *types.Client) int {
     }
 
     players := make(map[string]*types.Player)
-    
+
     players[req.UserId] = &player
 
     games[gameId] = &types.GameRoom{
@@ -80,7 +82,7 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
     }
 
     ok, errorResponse := helpers.CheckOwnership(games[req.GameId], req.UserId, move)
-    
+
     if !ok {
         return false, types.Coord{}, errorResponse
     }
@@ -142,11 +144,11 @@ func HandleRequest(req types.Request, client *types.Client) {
         games[req.GameId].FirstPlayerId = req.UserId
 
         opponentId := helpers.GetOpponentId(games[req.GameId], req.UserId)
-        
+
         if rand.Intn(2) == 0 {
             games[req.GameId].FirstPlayerId = opponentId
         }
-        
+
         response := types.Request{
             GameId: req.GameId,
             UserId: opponentId,
@@ -224,20 +226,20 @@ func HandleRequest(req types.Request, client *types.Client) {
                 moves := [3]types.Coord{}
                 for i, moveStr := range(moveStrs) {
                     ok, move, errorResponse := ParseMove(req, moveStr)
-    
+
                     if !ok {
                         helpers.SendToClient(errorResponse, client)
                         return
                     }
-    
+
                     moves[i] = move
                 }
-    
+
                 games[req.GameId].PlayMove(moves[0], "black")
                 games[req.GameId].PlayMove(moves[1], "black")
                 games[req.GameId].PlayMove(moves[2], "white")
                 message = "(played black on " + moves[0].String() + ", black on " +  moves[1].String() + ", and white on " +  moves[2].String() + " )"
-            } 
+            }
         case 2:
             response.Colors = make(map[string]string)
             opponentId := helpers.GetOpponentId(games[req.GameId], req.UserId)
@@ -271,7 +273,7 @@ func HandleRequest(req types.Request, client *types.Client) {
                 helpers.SendToClient(errorResponse, client)
                 return
             }
-    
+
             games[req.GameId].PlayMove(move, games[req.GameId].Players[req.UserId].Color)
 
             gameOver = helpers.CheckForWin(games[req.GameId], move, games[req.GameId].Players[req.UserId].Color)
@@ -304,9 +306,6 @@ func HandleRequest(req types.Request, client *types.Client) {
     default:
         fmt.Println("Unrecognized action!")
     }
-
-    fmt.Println(games)
-    fmt.Println("\n")
 }
 
 func sendHome(client *types.Client) {
@@ -339,30 +338,40 @@ func sendHome(client *types.Client) {
 
 type ClientManager struct {
     clients map[*types.Client]bool
-    broadcast chan []byte
     register chan *types.Client
     unregister chan *types.Client
+}
+
+func CloseSocket(client *types.Client) {
+    client.M.Lock()
+    defer client.M.Unlock()
+
+    if !client.Closed {
+        client.Socket.Close()
+        client.Closed = true
+    }
 }
 
 func (manager *ClientManager) receive(client *types.Client) {
     for {
         message := make([]byte, 4096)
         length, err := client.Socket.Read(message)
-        if err != nil {
-            manager.unregister <- client
-            client.Socket.Close()
-            client.Closed = true
-            break
-        }
+
         if length > 0 {
             request := util.DecodeGob(message)
             HandleRequest(request, client)
         }
+
+        if err != nil {
+            manager.unregister <- client
+            CloseSocket(client)
+            break
+        }
+
     }
 }
 
 func (manager *ClientManager) send(client *types.Client) {
-    defer client.Socket.Close()
     for {
         select {
         case message, ok := <-client.Data:
@@ -375,6 +384,7 @@ func (manager *ClientManager) send(client *types.Client) {
 }
 
 func (manager *ClientManager) start() {
+    fmt.Println("Listening for TCP connections...")
     for {
         select {
         case connection := <-manager.register:
@@ -382,18 +392,9 @@ func (manager *ClientManager) start() {
             fmt.Println("Added new connection!")
         case connection := <-manager.unregister:
             if _, ok := manager.clients[connection]; ok {
+                fmt.Println("A connection has terminated!")
                 close(connection.Data)
                 delete(manager.clients, connection)
-                fmt.Println("A connection has terminated!")
-            }
-        case message := <-manager.broadcast:
-            for connection := range manager.clients {
-                select {
-                case connection.Data <- message:
-                default:
-                    close(connection.Data)
-                    delete(manager.clients, connection)
-                }
             }
         }
     }
@@ -401,6 +402,8 @@ func (manager *ClientManager) start() {
 
 func Run(port string) {
     fmt.Println("Starting server...")
+    // db.Init()
+
     games = make(map[int]*types.GameRoom)
 
     listener, error := net.Listen("tcp", port)
@@ -411,19 +414,22 @@ func Run(port string) {
 
     manager := ClientManager{
         clients: make(map[*types.Client]bool),
-        broadcast: make(chan []byte),
         register: make(chan *types.Client),
         unregister: make(chan *types.Client),
     }
 
     go manager.start()
 
+    fmt.Println("Server running on port " + port + "!")
+
     for {
         connection, _ := listener.Accept()
         if error != nil {
             fmt.Println(error)
         }
+
         client := &types.Client{Socket: connection, Data: make(chan []byte)}
+
         manager.register <- client
         go manager.receive(client)
         go manager.send(client)

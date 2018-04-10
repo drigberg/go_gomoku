@@ -8,6 +8,7 @@ import (
 	"os"
 	"fmt"
 	"strconv"
+	"time"
 	"github.com/google/uuid"
 	"go_gomoku/util"
 	"go_gomoku/types"
@@ -25,6 +26,7 @@ var (
 	connection net.Conn
 	yourTurn = false
 	messages = []types.Message{}
+	connected chan bool
 	turn = 0
 	board map[string]map[string]bool
 	colors map[string]string
@@ -63,7 +65,7 @@ func PrintBoard() {
 func RefreshScreen() {
 	util.CallClear()
 
-	var turnStr string 
+	var turnStr string
 
 	if (turn > 0) {
 		turnStr = "Turn #" + strconv.Itoa(turn)
@@ -217,7 +219,7 @@ func Handler(message []byte) {
 				AddMessage("Joined game #" + gameIdStr, "Gomoku")
 				AddMessage(turnOneInstructions, "Gomoku")
 			} else {
-				AddMessage(request.Data, "Gomoku")
+				fmt.Println(request.Data)
 			}
 	case constants.OTHER_JOINED:
 		if request.Success {
@@ -237,6 +239,8 @@ func Handler(message []byte) {
 			AddMessage("Error! Could not parse message from opponent.", "Gomoku")
 		}
 	case constants.HOME:
+		go func() { connected <- true }()
+
 		util.CallClear()
 		fmt.Println("WELCOME TO GOMOKU!")
 		if len(request.Home) == 0 {
@@ -244,8 +248,8 @@ func Handler(message []byte) {
 		} else {
 			fmt.Println("Open Games")
 			fmt.Println("_________")
-	
-	
+
+
 			for _, game := range(request.Home) {
 				fmt.Println("Game Id: " + strconv.Itoa(game.Id) + " ----- User: " + game.UserId)
 			}
@@ -326,6 +330,8 @@ func ListenForInput() {
 }
 
 func Run(serverPort string) {
+	connected = make(chan bool)
+
 	colors = make(map[string]string)
 	colors["white"] = "\u25CF"
 	colors["black"] = "\u25CB"
@@ -349,6 +355,13 @@ func Run(serverPort string) {
 	go client.Receive(Handler)
 
 	board = make(map[string]map[string]bool)
+
+	select {
+	case <- connected:
+	case <- time.After(5 * time.Second):
+		fmt.Println("Could not connect!")
+		os.Exit(1)
+	}
 
 	ListenForInput()
 }

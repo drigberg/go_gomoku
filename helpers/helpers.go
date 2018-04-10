@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
+	"time"
 	"go_gomoku/types"
 	"go_gomoku/util"
 	"go_gomoku/constants"
@@ -21,7 +22,7 @@ func CheckOwnership(game *types.GameRoom, userId string, move types.Coord) (bool
 					Data: "That spot is already taken!",
 					Success: false,
 			}
-			
+
 			return false, errorResponse
 	}
 
@@ -38,7 +39,7 @@ func CheckAlongAxis(spots map[string]bool, axis [2]int, move types.Coord, num in
 		coordinates := strings.Split(c, " ")
 		x, _ := strconv.Atoi(coordinates[0])
 		y, _ := strconv.Atoi(coordinates[1])
-		
+
 		if x == next.X && y == next.Y {
 			return CheckAlongAxis(spots, axis, next, num + 1)
 		}
@@ -91,6 +92,25 @@ func IsTurn(game *types.GameRoom, userId string) bool {
 	return game.Turn % 2 == 0
 }
 
+func SendBackoff(data []byte, client *types.Client, i int) {
+	if client.Closed {
+		return
+	}
+
+	select {
+	case client.Data <- data:
+		return
+	default:
+		time.Sleep(500 * time.Millisecond)
+
+		fmt.Println("Trying again!", i)
+		if (i > 5) {
+			return
+		}
+		SendBackoff(data, client, i + 1)
+	}
+}
+
 func SendToClient(request types.Request, client *types.Client) {
 	data, err := util.GobToBytes(request)
 
@@ -99,9 +119,5 @@ func SendToClient(request types.Request, client *types.Client) {
 			return
 	}
 
-	select {
-	case client.Data <- data:
-	default:
-			close(client.Data)
-	}
+	SendBackoff(data, client, 1)
 }
