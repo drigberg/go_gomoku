@@ -182,6 +182,8 @@ func HandleRequest(req types.Request, client *types.Client) {
         otherClient := helpers.OtherClient(games[req.GameId], req.UserId)
 
         helpers.SendToClient(response, otherClient)
+    case constants.HOME:
+        sendHome(client)
     case constants.MOVE:
         response := types.Request{
             GameId: req.GameId,

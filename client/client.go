@@ -16,7 +16,9 @@ import (
 )
 
 var (
+	serverName = "Gomoku"
 	scanner = bufio.NewScanner(os.Stdin)
+	goingHome = false
 	gameId = 0
 	userId string
 	opponentId string
@@ -128,13 +130,13 @@ func CreateGame() {
 
 func JoinGame(gameIdStr string) {
 	if gameId != 0 {
-		AddMessage("You're already in a game!!", "Gomoku")
+		AddMessage("You're already in a game!!", serverName)
 		return
 	}
 
 	gameId, err := strconv.Atoi(gameIdStr)
 	if err != nil {
-		AddMessage("Please enter a valid integer as the game id to join!", "Gomoku")
+		AddMessage("Please enter a valid integer as the game id to join!", serverName)
 		return
 	}
 
@@ -150,12 +152,12 @@ func JoinGame(gameIdStr string) {
 
 func MakeMove(text string) {
 	if gameId == 0 {
-		AddMessage("You're not in a game yet!", "Gomoku")
+		AddMessage("You're not in a game yet!", serverName)
 		return
 	}
 
 	if turn == 0 {
-		AddMessage("The game hasn't started yet!", "Gomoku")
+		AddMessage("The game hasn't started yet!", serverName)
 		return
 	}
 
@@ -171,12 +173,12 @@ func MakeMove(text string) {
 
 func SendMessage(text string) {
 	if gameId == 0 {
-		AddMessage("You're not in a game yet!", "Gomoku")
+		AddMessage("You're not in a game yet!", serverName)
 		return
 	}
 
 	if turn == 0 {
-		AddMessage("The game hasn't started yet!", "Gomoku")
+		AddMessage("The game hasn't started yet!", serverName)
 		return
 	}
 
@@ -200,12 +202,12 @@ func Handler(message []byte) {
 			gameOver = false
 			gameIdStr := strconv.Itoa(request.GameId)
 
-			AddMessage("Created game #" + gameIdStr, "Gomoku")
+			AddMessage("Created game #" + gameIdStr, serverName)
 
 			gameId = request.GameId
 			yourTurn = true
 		} else {
-			AddMessage("Error! Could not create game.", "Gomoku")
+			AddMessage("Error! Could not create game.", serverName)
 		}
 	case constants.JOIN:
 			if request.Success {
@@ -216,8 +218,8 @@ func Handler(message []byte) {
 				turn = request.Turn
 				yourTurn = request.YourTurn
 
-				AddMessage("Joined game #" + gameIdStr, "Gomoku")
-				AddMessage(turnOneInstructions, "Gomoku")
+				AddMessage("Joined game #" + gameIdStr, serverName)
+				AddMessage(turnOneInstructions, serverName)
 			} else {
 				fmt.Println(request.Data)
 			}
@@ -227,19 +229,29 @@ func Handler(message []byte) {
 			opponentId = request.UserId
 
 			yourTurn = request.YourTurn
-			AddMessage("Let the game begin!", "Gomoku")
+			AddMessage("Let the game begin!", serverName)
 			if yourTurn {
-				AddMessage(turnOneInstructions, "Gomoku")
+				AddMessage(turnOneInstructions, serverName)
 			}
 		}
 	case constants.MESSAGE:
 		if request.Success {
 			AddMessage(request.Data, "Opponent")
 		} else {
-			AddMessage("Error! Could not parse message from opponent.", "Gomoku")
+			AddMessage("Error! Could not parse message from opponent.", serverName)
 		}
 	case constants.HOME:
 		go func() { connected <- true }()
+
+		gameOver = false
+		gameId = 0
+		goingHome = false
+		opponentId = ""
+		yourColor = ""
+		opponentColor = ""
+		messages = []types.Message{}
+		turn = 0
+		board = make(map[string]map[string]bool)
 
 		util.CallClear()
 		fmt.Println("WELCOME TO GOMOKU!")
@@ -279,48 +291,78 @@ func Handler(message []byte) {
 			yourTurn = request.YourTurn
 
 			AddMessage(request.Data, player)
+			if gameOver {
+				AddMessage("Type hm to go back to the main screen!", serverName)
+			}
 
 			if yourTurn && turn == 2 {
-				AddMessage(turnTwoInstructions, "Gomoku")
+				AddMessage(turnTwoInstructions, serverName)
 			}
 		} else {
-			AddMessage(request.Data, "Gomoku")
+			AddMessage(request.Data, serverName)
 		}
 	}
+}
+
+func BackToHome() {
+	request := types.Request{
+		Action: constants.HOME,
+	}
+
+	SendToServer(request)
 }
 
 func ListenForInput() {
 	for scanner.Scan() {
 		text := scanner.Text()
 
+		if text == "y" && goingHome {
+			BackToHome()
+			continue
+		}
+
+		// reset confirmation if user gives a different command
+		goingHome = false
+
+		if len(text) < 2 {
+			continue
+		}
+
 		switch action := text[:2]; action {
 		case "hp":
-			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", "Gomoku")
+			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", serverName)
 		case "mk":
 			CreateGame()
 		case "jn":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				AddMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
 			JoinGame(text[3:])
 		case "mg":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				AddMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
 			SendMessage(text[3:])
 		case "mv":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", "Gomoku")
+				AddMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
 			MakeMove(text[3:])
+		case "hm":
+			if gameOver {
+				BackToHome()
+				continue
+			} 
+			goingHome = true
+			AddMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
 		default:
-			AddMessage("Unrecognized command! Type 'hp' for help!", "Gomoku")
+			AddMessage("Unrecognized command! Type 'hp' for help!", serverName)
 		}
 
 		if scanner.Err() != nil {
