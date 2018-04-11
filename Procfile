@@ -1,1 +1,1 @@
-web: go-tcp-echo --port $PORT
+web: go_gomoku -port $PORT

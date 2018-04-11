@@ -9,10 +9,6 @@ import (
     "os"
 )
 
-var (
-    serverPort = ":9000"
-)
-
 func init() {
 	// define 'clear' command for each operating system
 	util.Clear = make(map[string]func())
@@ -36,6 +32,7 @@ func init() {
 
 func main() {
     clientMode := flag.Bool("play", false, "activate client mode")
+    serverPort := flag.Int("port", 9000, "port for server")
 
     flag.Parse()
 
