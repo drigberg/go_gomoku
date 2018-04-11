@@ -372,7 +372,7 @@ func ListenForInput() {
 	}
 }
 
-func Run(serverPort *int) {
+func Run(host *string, port *int) {
 	connected = make(chan bool)
 
 	colors = make(map[string]string)
@@ -386,9 +386,9 @@ func Run(serverPort *int) {
 	}
 	userId = uuid.String()
 
-	fmt.Println("Connecting to host on port " + strconv.Itoa(*serverPort) + "...")
+	fmt.Println("Connecting to host on port " + strconv.Itoa(*port) + "...")
 
-	conn, err := net.Dial("tcp", "localhost:" + strconv.Itoa(*serverPort))
+	conn, err := net.Dial("tcp", *host + ":" + strconv.Itoa(*port))
 	if err != nil {
 			fmt.Println(err)
 	}
