@@ -372,7 +372,7 @@ func ListenForInput() {
 	}
 }
 
-func Run(serverPort string) {
+func Run(serverPort *int) {
 	connected = make(chan bool)
 
 	colors = make(map[string]string)
@@ -386,7 +386,7 @@ func Run(serverPort string) {
 	}
 	userId = uuid.String()
 
-	conn, err := net.Dial("tcp", "go-gomoku.herokuapp.com" + serverPort)
+	conn, err := net.Dial("tcp", "go-gomoku.herokuapp.com:" + strconv.Itoa(*serverPort))
 	if err != nil {
 			fmt.Println(err)
 	}
