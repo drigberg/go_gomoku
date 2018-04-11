@@ -35,11 +35,11 @@ func init() {
 }
 
 func main() {
-    connect := flag.String("connect", "", "IP address of process to join. If empty, go into listen mode.")
+    clientMode := flag.Bool("play", false, "activate client mode")
 
     flag.Parse()
 
-    if *connect == "server" {
+    if *clientMode == false {
         server.Run(serverPort)
     } else {
         client.Run(serverPort)

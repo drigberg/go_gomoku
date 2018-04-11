@@ -386,7 +386,7 @@ func Run(serverPort string) {
 	}
 	userId = uuid.String()
 
-	conn, err := net.Dial("tcp", "localhost" + serverPort)
+	conn, err := net.Dial("tcp", "go-gomoku.herokuapp.com" + serverPort)
 	if err != nil {
 			fmt.Println(err)
 	}
