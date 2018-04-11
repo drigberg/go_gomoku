@@ -388,7 +388,7 @@ func Run(serverPort *int) {
 
 	fmt.Println("Connecting to host on port " + strconv.Itoa(*serverPort) + "...")
 
-	conn, err := net.Dial("tcp", "go-gomoku.herokuapp.com:" + strconv.Itoa(*serverPort))
+	conn, err := net.Dial("tcp", "localhost:" + strconv.Itoa(*serverPort))
 	if err != nil {
 			fmt.Println(err)
 	}

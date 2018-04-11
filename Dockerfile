@@ -8,4 +8,4 @@ RUN apk add --no-cache git mercurial \
 
 RUN go install -v github.com/google/uuid
 
-CMD go build ./main.go && ./main -connect server
+CMD go build ./main.go && ./main
