@@ -1,29 +1,11 @@
 version: '3'
 
 services:
-  gomoku_db:
-    container_name: gomoku_db
-    image: postgres:9.6.5-alpine
-    ports:
-      - "5432:5432"
-    env_file: .env
-    environment:
-      POSTGRES_DB: gomoku
-      POSTGRES_USER: gomoku
-      POSTGRES_PASSWORD: gomoku
-    volumes:
-      - db-volume:/var/lib/postgresql/data
   app:
     container_name: gomoku_app
     build:
       context: .
     volumes:
       - .:/go/src/go_gomoku
-    links:
-      - gomoku_db
-    depends_on:
-      - gomoku_db
     ports:
       - 9000:9000
-volumes:
-  db-volume:

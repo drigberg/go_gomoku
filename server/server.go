@@ -10,7 +10,6 @@ import (
     "go_gomoku/types"
     "go_gomoku/constants"
     "go_gomoku/helpers"
-    // "go_gomoku/db"
 )
 
 
@@ -404,7 +403,6 @@ func (manager *ClientManager) start() {
 
 func Run(port string) {
     fmt.Println("Starting server...")
-    // db.Init()
 
     games = make(map[int]*types.GameRoom)
 
