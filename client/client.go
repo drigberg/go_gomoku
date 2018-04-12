@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"go_gomoku/util"
 	"go_gomoku/types"
+	"go_gomoku/helpers"
 	"go_gomoku/constants"
 )
 
@@ -31,38 +32,9 @@ var (
 	connected chan bool
 	turn = 0
 	board map[string]map[string]bool
-	colors map[string]string
 	turnOneInstructions = "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
 	turnTwoInstructions = "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 )
-
-func PrintBoard() {
-	for y := 0; y < 15; y++ {
-		row := ""
-		for x := 0; x < 16; x++ {
-			coord := types.Coord {
-				X: x + 1,
-				Y: y,
-			}
-
-			if y == 0 {
-				row += " "
-			} else {
-				row += "|"
-			}
-
-			if (x != 15) {
-				color := util.IsTakenBy(board, coord)
-				if color == constants.FREE {
-					row += "_"
-				} else {
-					row += colors[color]
-				}
-			}
-		}
-		fmt.Println(row)
-	}
-}
 
 func RefreshScreen() {
 	util.CallClear()
@@ -86,7 +58,8 @@ func RefreshScreen() {
 
 
 	fmt.Println(turnStr)
-	PrintBoard()
+	helpers.PrintBoard(board)
+
 	for _, message := range(messages) {
 		message.Print()
 	}
@@ -219,7 +192,9 @@ func Handler(message []byte) {
 				yourTurn = request.YourTurn
 
 				AddMessage("Joined game #" + gameIdStr, serverName)
-				AddMessage(turnOneInstructions, serverName)
+				if yourTurn {
+					AddMessage(turnOneInstructions, serverName)
+				}
 			} else {
 				fmt.Println(request.Data)
 			}
@@ -358,7 +333,7 @@ func ListenForInput() {
 			if gameOver || gameId == 0 {
 				BackToHome()
 				continue
-			} 
+			}
 
 			goingHome = true
 			AddMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
@@ -374,10 +349,7 @@ func ListenForInput() {
 
 func Run(host *string, port *int) {
 	connected = make(chan bool)
-
-	colors = make(map[string]string)
-	colors["white"] = "\u25CF"
-	colors["black"] = "\u25CB"
+	helpers.InitMaps()
 
 	// create addresses
 	uuid, err := uuid.NewUUID()

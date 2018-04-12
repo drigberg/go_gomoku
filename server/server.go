@@ -50,7 +50,7 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
             GameId: req.GameId,
             UserId: req.UserId,
             Action: constants.MOVE,
-            Data: "The syntax for this move is mv <x> <y>, <x> <y>, <x> <y>",
+            Data: "The syntax for a move is mv <x> <y>",
             Success: false,
         }
 
