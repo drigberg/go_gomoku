@@ -37,7 +37,7 @@ func main() {
 		port = "5000"
 	}
 
-	host := flag.String("host", "localhost", "server tcp host")
+	host := flag.String("host", "GoGomoku-env.ipxp2bqu4z.eu-west-1.elasticbeanstalk.com", "server tcp host")
 
     flag.Parse()
 
