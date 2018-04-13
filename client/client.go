@@ -36,9 +36,7 @@ var (
 	turnTwoInstructions = "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 )
 
-func RefreshScreen() {
-	util.CallClear()
-
+func printTurn() {
 	var turnStr string
 
 	if (turn > 0) {
@@ -56,13 +54,28 @@ func RefreshScreen() {
 		}
 	}
 
-
 	fmt.Println(turnStr)
-	helpers.PrintBoard(board)
+}
 
-	for _, message := range(messages) {
+func printMessages() {
+	toPrint := messages
+	length := len(messages)
+
+	if length > 5 {
+		toPrint = messages[length - 6:]
+	}
+
+	for _, message := range(toPrint) {
 		message.Print()
 	}
+}
+
+func RefreshScreen() {
+	util.CallClear()
+
+	printTurn()
+	helpers.PrintBoard(board)
+	printMessages()
 }
 
 // Send request struct to server as byte array

@@ -266,6 +266,7 @@ func HandleRequest(req types.Request, client *types.Client) {
                 response.Colors[opponentId] = "black"
 
                 games[req.GameId].PlayMove(move, "white")
+                message = "(played on " + req.Data + " )"
             }
         default:
             ok, move, errorResponse := ParseMove(req, req.Data)
