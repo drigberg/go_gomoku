@@ -32,7 +32,7 @@ func init() {
 
 func main() {
     clientMode := flag.Bool("play", false, "activate client mode")
-	port := flag.Int("port", 9000, "port for server")
+	port := flag.Int("port", 5000, "port for server")
 	host := flag.String("host", "localhost", "server tcp host")
 
     flag.Parse()
