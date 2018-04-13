@@ -1,1 +1,0 @@
-web: go_gomoku -port $PORT

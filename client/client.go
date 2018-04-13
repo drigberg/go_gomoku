@@ -360,7 +360,7 @@ func ListenForInput() {
 	}
 }
 
-func Run(host *string, port *int) {
+func Run(host *string, port string) {
 	connected = make(chan bool)
 	helpers.InitMaps()
 
@@ -371,9 +371,9 @@ func Run(host *string, port *int) {
 	}
 	userId = uuid.String()
 
-	fmt.Println("Connecting to host on port " + strconv.Itoa(*port) + "...")
+	fmt.Println("Connecting to host on port " + port + "...")
 
-	conn, err := net.Dial("tcp", *host + ":" + strconv.Itoa(*port))
+	conn, err := net.Dial("tcp", *host + ":" + port)
 	if err != nil {
 			fmt.Println(err)
 	}

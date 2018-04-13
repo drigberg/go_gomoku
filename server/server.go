@@ -402,12 +402,12 @@ func (manager *ClientManager) start() {
     }
 }
 
-func Run(port *int) {
+func Run(port string) {
     fmt.Println("Starting server...")
 
     games = make(map[int]*types.GameRoom)
 
-    listener, error := net.Listen("tcp", ":" + strconv.Itoa(*port))
+    listener, error := net.Listen("tcp", ":" + port)
 
     if error != nil {
         fmt.Println(error)
@@ -421,7 +421,7 @@ func Run(port *int) {
 
     go manager.start()
 
-    fmt.Println("Server running on port " + strconv.Itoa(*port) + "!")
+    fmt.Println("Server running on port " + port + "!")
 
     for {
         connection, _ := listener.Accept()
