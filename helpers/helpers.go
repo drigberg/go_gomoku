@@ -121,7 +121,9 @@ func IsTurn(game *types.GameRoom, userID string) bool {
 
 // SendBackoff tries to send and keeps trying
 func SendBackoff(data []byte, client *types.Client, i int) {
-	fmt.Println("Contacting client! Attempt:", i)
+	if i > 1 {
+		fmt.Println("Retrying message send! Attempt:", i)
+	}
 	if client.Closed {
 		return
 	}

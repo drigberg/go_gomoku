@@ -9,8 +9,8 @@ import (
 	"os/exec"
 )
 
+// define 'clear' command for each operating system
 func init() {
-	// define 'clear' command for each operating system
 	util.Clear = make(map[string]func())
 	util.Clear["linux"] = func() {
 		cmd := exec.Command("clear")

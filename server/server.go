@@ -1,11 +1,11 @@
 package server
 
 import (
-	"fmt"
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
 	"go_gomoku/util"
+	"log"
 	"math/rand"
 	"net"
 	"strconv"
@@ -92,7 +92,7 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
 
 // HandleRequest handles a request
 func HandleRequest(req types.Request, client *types.Client) {
-	fmt.Println("Received!", client, req)
+	log.Print("Received!", client, req)
 
 	switch action := req.Action; action {
 	case constants.CREATE:
@@ -306,7 +306,7 @@ func HandleRequest(req types.Request, client *types.Client) {
 		helpers.SendToClient(response, otherClient)
 
 	default:
-		fmt.Println("Unrecognized action:", req.Action)
+		log.Println("Unrecognized action:", req.Action)
 	}
 }
 
@@ -387,15 +387,15 @@ func (manager *ClientManager) send(client *types.Client) {
 }
 
 func (manager *ClientManager) start() {
-	fmt.Println("Client manager listening for clients joining/leaving...")
+	log.Println("Client manager listening for clients joining/leaving...")
 	for {
 		select {
 		case client := <-manager.register:
 			manager.clients[client] = true
-			fmt.Println("Added new client!")
+			log.Println("Added new client!")
 		case client := <-manager.unregister:
 			if _, ok := manager.clients[client]; ok {
-				fmt.Println("A client has left!")
+				log.Println("A client has left!")
 				close(client.Data)
 				delete(manager.clients, client)
 			}
@@ -405,14 +405,14 @@ func (manager *ClientManager) start() {
 
 // Run is the task for the client
 func Run(port string) {
-	fmt.Println("Starting server...")
+	log.Println("Starting server...")
 
 	games = make(map[int]*types.GameRoom)
 
 	listener, error := net.Listen("tcp", ":"+port)
 
 	if error != nil {
-		fmt.Println(error)
+		log.Println(error)
 	}
 
 	manager := ClientManager{
@@ -423,12 +423,12 @@ func Run(port string) {
 
 	go manager.start()
 
-	fmt.Println("Server listening on port " + port + "!")
+	log.Println("Server listening on port " + port + "!")
 
 	for {
 		connection, _ := listener.Accept()
 		if error != nil {
-			fmt.Println(error)
+			log.Println(error)
 		}
 
 		client := &types.Client{Socket: connection, Data: make(chan []byte)}
