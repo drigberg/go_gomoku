@@ -2,11 +2,11 @@ package client
 
 import (
 	"bufio"
-	// "io/ioutil"
 	"fmt"
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -17,7 +17,6 @@ import (
 
 var (
 	serverName          = "Gomoku"
-	scanner             = bufio.NewScanner(os.Stdin)
 	goingHome           = false
 	gameID              = 0
 	userID              string
@@ -28,7 +27,6 @@ var (
 	connection          net.Conn
 	yourTurn            = false
 	messages            = []types.Message{}
-	connected           chan bool
 	turn                = 0
 	board               map[string]map[string]bool
 	turnOneInstructions = "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
@@ -228,8 +226,6 @@ func Handler(message []byte) {
 			addMessage("Error! Could not parse message from opponent.", serverName)
 		}
 	case constants.HOME:
-		go func() { connected <- true }()
-
 		gameOver = false
 		gameID = 0
 		goingHome = false
@@ -299,6 +295,7 @@ func backToHome() {
 }
 
 func listenForInput() {
+	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		text := scanner.Text()
 
@@ -324,28 +321,24 @@ func listenForInput() {
 				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
-
 			joinGame(text[3:])
 		case "mg":
 			if len(text) < 4 {
 				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
-
 			sendMessage(text[3:])
 		case "mv":
 			if len(text) < 4 {
 				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
-
 			makeMove(text[3:])
 		case "hm":
 			if gameOver || gameID == 0 {
 				backToHome()
 				continue
 			}
-
 			goingHome = true
 			addMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
 		default:
@@ -358,32 +351,32 @@ func listenForInput() {
 	}
 }
 
+func init() {
+	board = make(map[string]map[string]bool)
+}
+
 // Run runs the client
 func Run(host string, port string) {
-	connected = make(chan bool)
 	helpers.InitMaps()
 
 	// create addresses
 	uuid, err := uuid.NewUUID()
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 	userID = uuid.String()
 
 	fmt.Println("Connecting to host on port " + port + "...")
-
 	conn, err := net.Dial("tcp", host+":"+port)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
 	connection = conn
-
 	client := &types.Client{Socket: connection}
 
-	go client.Receive(Handler)
-
-	board = make(map[string]map[string]bool)
+	connected := make(chan bool)
+	go client.Receive(Handler, &connected)
 
 	select {
 	case <-connected:

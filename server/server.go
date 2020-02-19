@@ -11,14 +11,50 @@ import (
 	"strings"
 )
 
-var (
-	games  map[int]*types.GameRoom
-	gameID = 0
-)
+// Server handles all requests and game states
+type Server struct {
+	Games  map[int]*types.GameRoom
+	GameID int
+}
+
+// Listen starts the server
+func (server *Server) Listen(port string) {
+	log.Println("Starting server...")
+	listener, error := net.Listen("tcp", ":"+port)
+	if error != nil {
+		log.Println(error)
+	}
+
+	// create client manager
+	manager := ClientManager{
+		clients:    make(map[*types.Client]bool),
+		register:   make(chan *types.Client),
+		unregister: make(chan *types.Client),
+	}
+
+	go manager.start()
+
+	log.Println("Server listening on port " + port + "!")
+
+	for {
+		connection, _ := listener.Accept()
+		if error != nil {
+			log.Println(error)
+		}
+
+		client := &types.Client{Socket: connection, Data: make(chan []byte)}
+
+		manager.register <- client
+		go manager.receive(client, server)
+		go manager.send(client)
+
+		server.sendHome(client)
+	}
+}
 
 // CreateGame creates a game and returns the id
-func CreateGame(req types.Request, client *types.Client) int {
-	gameID++
+func (server *Server) CreateGame(req types.Request, client *types.Client) int {
+	server.GameID++
 	player := types.Player{
 		UserID: req.UserID,
 		Client: client,
@@ -28,21 +64,21 @@ func CreateGame(req types.Request, client *types.Client) int {
 
 	players[req.UserID] = &player
 
-	games[gameID] = &types.GameRoom{
-		ID:      gameID,
+	server.Games[server.GameID] = &types.GameRoom{
+		ID:      server.GameID,
 		Players: players,
 		Turn:    0,
 		Board:   make(map[string]map[string]bool),
 	}
 
-	games[gameID].Board["white"] = make(map[string]bool)
-	games[gameID].Board["black"] = make(map[string]bool)
+	server.Games[server.GameID].Board["white"] = make(map[string]bool)
+	server.Games[server.GameID].Board["black"] = make(map[string]bool)
 
-	return gameID
+	return server.GameID
 }
 
 // ParseMove validates the string from a mv command
-func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Request) {
+func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Request) {
 	coordinates := strings.Split(moveStr, " ")
 
 	if len(coordinates) != 2 {
@@ -80,7 +116,7 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
 		Y: y,
 	}
 
-	ok, errorResponse := helpers.CheckOwnership(games[req.GameID], req.UserID, move)
+	ok, errorResponse := helpers.CheckOwnership(server.Games[req.GameID], req.UserID, move)
 
 	if !ok {
 		return false, types.Coord{}, errorResponse
@@ -90,12 +126,13 @@ func ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Requ
 }
 
 // HandleRequest handles a request
-func HandleRequest(req types.Request, client *types.Client) {
+func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 	log.Print("Received!", client, req)
+	activeGame := server.Games[req.GameID]
 
 	switch action := req.Action; action {
 	case constants.CREATE:
-		gameID := CreateGame(req, client)
+		gameID := server.CreateGame(req, client)
 
 		response := types.Request{
 			GameID:  gameID,
@@ -105,9 +142,9 @@ func HandleRequest(req types.Request, client *types.Client) {
 
 		helpers.SendToClient(response, client)
 	case constants.JOIN:
-		otherClient := helpers.OtherClient(games[req.GameID], req.UserID)
+		otherClient := helpers.OtherClient(activeGame, req.UserID)
 
-		if len(games[req.GameID].Players) == 2 {
+		if len(activeGame.Players) == 2 {
 			response := types.Request{
 				GameID:  req.GameID,
 				Action:  constants.JOIN,
@@ -136,15 +173,15 @@ func HandleRequest(req types.Request, client *types.Client) {
 			Client: client,
 		}
 
-		games[req.GameID].Players[req.UserID] = &player
-		games[req.GameID].Turn = 1
+		activeGame.Players[req.UserID] = &player
+		activeGame.Turn = 1
 
-		games[req.GameID].FirstPlayerId = req.UserID
+		activeGame.FirstPlayerId = req.UserID
 
-		opponentID := helpers.GetOpponentID(games[req.GameID], req.UserID)
+		opponentID := helpers.GetOpponentID(activeGame, req.UserID)
 
 		if rand.Intn(2) == 0 {
-			games[req.GameID].FirstPlayerId = opponentID
+			activeGame.FirstPlayerId = opponentID
 		}
 
 		response := types.Request{
@@ -152,8 +189,8 @@ func HandleRequest(req types.Request, client *types.Client) {
 			UserID:   opponentID,
 			Action:   constants.JOIN,
 			Success:  true,
-			YourTurn: games[req.GameID].FirstPlayerId == req.UserID,
-			Turn:     games[req.GameID].Turn,
+			YourTurn: activeGame.FirstPlayerId == req.UserID,
+			Turn:     activeGame.Turn,
 		}
 
 		helpers.SendToClient(response, client)
@@ -162,8 +199,8 @@ func HandleRequest(req types.Request, client *types.Client) {
 			GameID:   req.GameID,
 			Action:   constants.OTHERJOINED,
 			Success:  true,
-			YourTurn: games[req.GameID].FirstPlayerId != req.UserID,
-			Turn:     games[req.GameID].Turn,
+			YourTurn: activeGame.FirstPlayerId != req.UserID,
+			Turn:     activeGame.Turn,
 			UserID:   req.UserID,
 		}
 
@@ -177,11 +214,11 @@ func HandleRequest(req types.Request, client *types.Client) {
 			Success: true,
 		}
 
-		otherClient := helpers.OtherClient(games[req.GameID], req.UserID)
+		otherClient := helpers.OtherClient(activeGame, req.UserID)
 
 		helpers.SendToClient(response, otherClient)
 	case constants.HOME:
-		sendHome(client)
+		server.sendHome(client)
 	case constants.MOVE:
 		response := types.Request{
 			GameID: req.GameID,
@@ -189,7 +226,7 @@ func HandleRequest(req types.Request, client *types.Client) {
 			Action: constants.MOVE,
 		}
 
-		valid := helpers.IsTurn(games[req.GameID], req.UserID)
+		valid := helpers.IsTurn(activeGame, req.UserID)
 		gameOver := false
 		var message string
 
@@ -206,9 +243,9 @@ func HandleRequest(req types.Request, client *types.Client) {
 			return
 		}
 
-		switch turn := games[req.GameID].Turn; turn {
+		switch turn := activeGame.Turn; turn {
 		case 1:
-			if games[req.GameID].Turn == 1 {
+			if activeGame.Turn == 1 {
 				moveStrs := strings.Split(req.Data, ", ")
 				if len(moveStrs) != 3 {
 					errorResponse := types.Request{
@@ -225,7 +262,7 @@ func HandleRequest(req types.Request, client *types.Client) {
 
 				moves := [3]types.Coord{}
 				for i, moveStr := range moveStrs {
-					ok, move, errorResponse := ParseMove(req, moveStr)
+					ok, move, errorResponse := server.ParseMove(req, moveStr)
 
 					if !ok {
 						helpers.SendToClient(errorResponse, client)
@@ -235,51 +272,51 @@ func HandleRequest(req types.Request, client *types.Client) {
 					moves[i] = move
 				}
 
-				games[req.GameID].PlayMove(moves[0], "black")
-				games[req.GameID].PlayMove(moves[1], "black")
-				games[req.GameID].PlayMove(moves[2], "white")
+				activeGame.PlayMove(moves[0], "black")
+				activeGame.PlayMove(moves[1], "black")
+				activeGame.PlayMove(moves[2], "white")
 				message = "(played black on " + moves[0].String() + ", black on " + moves[1].String() + ", and white on " + moves[2].String() + " )"
 			}
 		case 2:
 			response.Colors = make(map[string]string)
-			opponentID := helpers.GetOpponentID(games[req.GameID], req.UserID)
+			opponentID := helpers.GetOpponentID(activeGame, req.UserID)
 
 			if req.Data == "pass" {
 				message = "(passed and is now black -- back to player 1)"
 
-				games[req.GameID].Players[req.UserID].Color = "black"
-				games[req.GameID].Players[opponentID].Color = "white"
+				activeGame.Players[req.UserID].Color = "black"
+				activeGame.Players[opponentID].Color = "white"
 				response.Colors[req.UserID] = "black"
 				response.Colors[opponentID] = "white"
 			} else {
-				ok, move, errorResponse := ParseMove(req, req.Data)
+				ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 				if !ok {
 					helpers.SendToClient(errorResponse, client)
 					return
 				}
 
-				games[req.GameID].Players[req.UserID].Color = "white"
-				games[req.GameID].Players[opponentID].Color = "black"
+				activeGame.Players[req.UserID].Color = "white"
+				activeGame.Players[opponentID].Color = "black"
 				response.Colors[req.UserID] = "white"
 				response.Colors[opponentID] = "black"
 
-				games[req.GameID].PlayMove(move, "white")
+				activeGame.PlayMove(move, "white")
 				message = "(played on " + req.Data + " )"
 			}
 		default:
-			ok, move, errorResponse := ParseMove(req, req.Data)
+			ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 			if !ok {
 				helpers.SendToClient(errorResponse, client)
 				return
 			}
 
-			games[req.GameID].PlayMove(move, games[req.GameID].Players[req.UserID].Color)
+			activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
 
-			gameOver = helpers.CheckForWin(games[req.GameID], move, games[req.GameID].Players[req.UserID].Color)
+			gameOver = helpers.CheckForWin(activeGame, move, activeGame.Players[req.UserID].Color)
 			if gameOver {
-				games[req.GameID].IsOver = true
+				activeGame.IsOver = true
 				response.GameOver = true
 				message = "won!!!! (" + req.Data + " )"
 			} else {
@@ -288,19 +325,19 @@ func HandleRequest(req types.Request, client *types.Client) {
 		}
 
 		response.Success = true
-		response.Board = games[req.GameID].Board
+		response.Board = activeGame.Board
 		response.Data = message
 
 		if !gameOver {
-			games[req.GameID].Turn++
+			activeGame.Turn++
 
 			response.YourTurn = false
-			response.Turn = games[req.GameID].Turn
+			response.Turn = activeGame.Turn
 		}
 
 		helpers.SendToClient(response, client)
 
-		otherClient := helpers.OtherClient(games[req.GameID], req.UserID)
+		otherClient := helpers.OtherClient(activeGame, req.UserID)
 		response.YourTurn = true
 		helpers.SendToClient(response, otherClient)
 
@@ -309,10 +346,10 @@ func HandleRequest(req types.Request, client *types.Client) {
 	}
 }
 
-func sendHome(client *types.Client) {
+func (server *Server) sendHome(client *types.Client) {
 	home := []types.OpenRoom{}
 
-	for _, game := range games {
+	for _, game := range server.Games {
 		if !game.IsOver && len(game.Players) == 1 {
 			var userID string
 			for id := range game.Players {
@@ -354,14 +391,14 @@ func CloseSocket(client *types.Client) {
 	}
 }
 
-func (manager *ClientManager) receive(client *types.Client) {
+func (manager *ClientManager) receive(client *types.Client, server *Server) {
 	for {
 		message := make([]byte, 4096)
 		length, err := client.Socket.Read(message)
 
 		if length > 0 {
 			request := helpers.DecodeGob(message)
-			HandleRequest(request, client)
+			server.HandleRequest(request, client)
 		}
 
 		if err != nil {
@@ -399,43 +436,5 @@ func (manager *ClientManager) start() {
 				delete(manager.clients, client)
 			}
 		}
-	}
-}
-
-// Run is the task for the client
-func Run(port string) {
-	log.Println("Starting server...")
-
-	games = make(map[int]*types.GameRoom)
-
-	listener, error := net.Listen("tcp", ":"+port)
-
-	if error != nil {
-		log.Println(error)
-	}
-
-	manager := ClientManager{
-		clients:    make(map[*types.Client]bool),
-		register:   make(chan *types.Client),
-		unregister: make(chan *types.Client),
-	}
-
-	go manager.start()
-
-	log.Println("Server listening on port " + port + "!")
-
-	for {
-		connection, _ := listener.Accept()
-		if error != nil {
-			log.Println(error)
-		}
-
-		client := &types.Client{Socket: connection, Data: make(chan []byte)}
-
-		manager.register <- client
-		go manager.receive(client)
-		go manager.send(client)
-
-		sendHome(client)
 	}
 }

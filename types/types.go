@@ -15,7 +15,9 @@ type Client struct {
 	M      sync.Mutex
 }
 
-func (client *Client) Receive(handler func([]byte)) {
+// Receive listens for data and handles it
+func (client *Client) Receive(handler func([]byte), connected *chan bool) {
+	firstMessage := true
 	for {
 		message := make([]byte, 4096)
 		length, err := client.Socket.Read(message)
@@ -25,6 +27,10 @@ func (client *Client) Receive(handler func([]byte)) {
 		}
 		if length > 0 {
 			// switch
+			if firstMessage {
+				go func() { *connected <- true }()
+				firstMessage = false
+			}
 			handler(message)
 		}
 	}
