@@ -117,7 +117,6 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 	}
 
 	ok, errorResponse := helpers.CheckOwnership(server.games[req.GameID], req.UserID, move)
-
 	if !ok {
 		return false, types.Coord{}, errorResponse
 	}
@@ -127,13 +126,11 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 
 func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) {
 	gameID := server.CreateGame(req, socketClient)
-
 	response := types.Request{
 		GameID:  gameID,
 		Action:  constants.CREATE,
 		Success: true,
 	}
-
 	helpers.SendToClient(response, socketClient)
 }
 
@@ -171,11 +168,8 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 
 	activeGame.Players[req.UserID] = &player
 	activeGame.Turn = 1
-
 	activeGame.FirstPlayerId = req.UserID
-
 	opponentID := helpers.GetOpponentID(activeGame, req.UserID)
-
 	if rand.Intn(2) == 0 {
 		activeGame.FirstPlayerId = opponentID
 	}
@@ -188,9 +182,6 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		YourTurn: activeGame.FirstPlayerId == req.UserID,
 		Turn:     activeGame.Turn,
 	}
-
-	helpers.SendToClient(response, socketClient)
-
 	notification := types.Request{
 		GameID:   req.GameID,
 		Action:   constants.OTHERJOINED,
@@ -200,6 +191,7 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		UserID:   req.UserID,
 	}
 
+	helpers.SendToClient(response, socketClient)
 	helpers.SendToClient(notification, otherClient)
 }
 
