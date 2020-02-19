@@ -4,7 +4,6 @@ import (
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
-	"go_gomoku/util"
 	"log"
 	"math/rand"
 	"net"
@@ -361,7 +360,7 @@ func (manager *ClientManager) receive(client *types.Client) {
 		length, err := client.Socket.Read(message)
 
 		if length > 0 {
-			request := util.DecodeGob(message)
+			request := helpers.DecodeGob(message)
 			HandleRequest(request, client)
 		}
 

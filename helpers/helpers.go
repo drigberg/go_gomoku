@@ -1,10 +1,14 @@
 package helpers
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"go_gomoku/constants"
 	"go_gomoku/types"
-	"go_gomoku/util"
+	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -36,9 +40,74 @@ var (
 	colors                map[string]string
 )
 
+func clearWindows() {
+	cmd := exec.Command("cmd", "/c", "cls")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+func clearLinuxOrDarwin() {
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+// ClearScreen clears the screen, based on operating system
+func ClearScreen() {
+	switch runtime.GOOS {
+	case "linux":
+	case "darwin":
+		clearLinuxOrDarwin()
+	case "windows":
+		clearWindows()
+	default:
+		panic("Your platform is unsupported! Can't clear the terminal screen.")
+	}
+}
+
+// DecodeGob builds a request from a gob
+func DecodeGob(message []byte) types.Request {
+	var network bytes.Buffer
+	network.Write(message)
+	var request types.Request
+
+	dec := gob.NewDecoder(&network)
+
+	err := dec.Decode(&request)
+
+	if err != nil {
+		fmt.Println("Error decoding GOB data:", err)
+	}
+
+	return request
+}
+
+// GobToBytes converts a gob to bytes
+func GobToBytes(key interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(key)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func isTakenBy(board map[string]map[string]bool, move types.Coord) string {
+	spotStr := move.String()
+
+	for color := range board {
+		if board[color][spotStr] {
+			return color
+		}
+	}
+
+	return constants.FREE
+}
+
 // CheckOwnership checks whether a spot has been taken already
 func CheckOwnership(game *types.GameRoom, userID string, move types.Coord) (bool, types.Request) {
-	if util.IsTakenBy(game.Board, move) != constants.FREE {
+	if isTakenBy(game.Board, move) != constants.FREE {
 		errorResponse := types.Request{
 			GameID:  game.ID,
 			UserID:  userID,
@@ -335,7 +404,7 @@ func PrintBoard(board map[string]map[string]bool) {
 
 			coord := GetCoord(x, y)
 
-			occupied = util.IsTakenBy(board, coord)
+			occupied = isTakenBy(board, coord)
 
 			if y%2 == 1 {
 				row += getRowChar(x, y, occupied, prevOccupied)
@@ -358,7 +427,7 @@ func InitMaps() {
 
 // SendToClient tries to send a request to client, with backoff
 func SendToClient(request types.Request, client *types.Client) {
-	data, err := util.GobToBytes(request)
+	data, err := GobToBytes(request)
 
 	if err != nil {
 		fmt.Println(err)

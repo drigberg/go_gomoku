@@ -7,7 +7,6 @@ import (
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
-	"go_gomoku/util"
 	"net"
 	"os"
 	"strconv"
@@ -71,7 +70,7 @@ func printMessages() {
 }
 
 func refreshScreen() {
-	util.CallClear()
+	helpers.ClearScreen()
 
 	printTurn()
 	helpers.PrintBoard(board)
@@ -79,7 +78,7 @@ func refreshScreen() {
 }
 
 func sendToServer(request types.Request) {
-	data, err := util.GobToBytes(request)
+	data, err := helpers.GobToBytes(request)
 
 	if err != nil {
 		fmt.Println(err)
@@ -180,7 +179,7 @@ func sendMessage(text string) {
 
 // Handler handles requests
 func Handler(message []byte) {
-	request := util.DecodeGob(message)
+	request := helpers.DecodeGob(message)
 
 	switch action := request.Action; action {
 	case constants.CREATE:
@@ -241,7 +240,7 @@ func Handler(message []byte) {
 		turn = 0
 		board = make(map[string]map[string]bool)
 
-		util.CallClear()
+		helpers.ClearScreen()
 		fmt.Println("WELCOME TO GOMOKU!")
 		if len(request.Home) == 0 {
 			fmt.Println("No open games! Type 'mk' to make a new game!")
