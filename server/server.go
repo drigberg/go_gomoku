@@ -125,186 +125,168 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 	return true, move, types.Request{}
 }
 
-// HandleRequest handles a request
-func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
-	log.Print("Received!", socketClient, req)
-	activeGame := server.games[req.GameID]
+func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) {
+	gameID := server.CreateGame(req, socketClient)
 
-	switch action := req.Action; action {
-	case constants.CREATE:
-		gameID := server.CreateGame(req, socketClient)
+	response := types.Request{
+		GameID:  gameID,
+		Action:  constants.CREATE,
+		Success: true,
+	}
 
-		response := types.Request{
-			GameID:  gameID,
-			Action:  constants.CREATE,
-			Success: true,
-		}
+	helpers.SendToClient(response, socketClient)
+}
 
-		helpers.SendToClient(response, socketClient)
-	case constants.JOIN:
-		otherClient := helpers.OtherClient(activeGame, req.UserID)
+func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
+	otherClient := helpers.OtherClient(activeGame, req.UserID)
 
-		if len(activeGame.Players) == 2 {
-			response := types.Request{
-				GameID:  req.GameID,
-				Action:  constants.JOIN,
-				Success: false,
-				Data:    "Game is full already",
-			}
-
-			helpers.SendToClient(response, socketClient)
-			return
-		}
-
-		if otherClient.Closed {
-			response := types.Request{
-				GameID:  req.GameID,
-				Action:  constants.JOIN,
-				Success: false,
-				Data:    "Other player already left that game",
-			}
-
-			helpers.SendToClient(response, socketClient)
-			return
-		}
-
-		player := types.Player{
-			UserID:       req.UserID,
-			SocketClient: socketClient,
-		}
-
-		activeGame.Players[req.UserID] = &player
-		activeGame.Turn = 1
-
-		activeGame.FirstPlayerId = req.UserID
-
-		opponentID := helpers.GetOpponentID(activeGame, req.UserID)
-
-		if rand.Intn(2) == 0 {
-			activeGame.FirstPlayerId = opponentID
-		}
-
-		response := types.Request{
-			GameID:   req.GameID,
-			UserID:   opponentID,
-			Action:   constants.JOIN,
-			Success:  true,
-			YourTurn: activeGame.FirstPlayerId == req.UserID,
-			Turn:     activeGame.Turn,
-		}
-
-		helpers.SendToClient(response, socketClient)
-
-		notification := types.Request{
-			GameID:   req.GameID,
-			Action:   constants.OTHERJOINED,
-			Success:  true,
-			YourTurn: activeGame.FirstPlayerId != req.UserID,
-			Turn:     activeGame.Turn,
-			UserID:   req.UserID,
-		}
-
-		helpers.SendToClient(notification, otherClient)
-	case constants.MESSAGE:
+	if len(activeGame.Players) == 2 {
 		response := types.Request{
 			GameID:  req.GameID,
-			UserID:  req.UserID,
-			Action:  constants.MESSAGE,
-			Data:    req.Data,
-			Success: true,
+			Action:  constants.JOIN,
+			Success: false,
+			Data:    "Game is full already",
 		}
 
-		otherClient := helpers.OtherClient(activeGame, req.UserID)
+		helpers.SendToClient(response, socketClient)
+		return
+	}
 
-		helpers.SendToClient(response, otherClient)
-	case constants.HOME:
-		server.sendHome(socketClient)
-	case constants.MOVE:
+	if otherClient.Closed {
 		response := types.Request{
-			GameID: req.GameID,
-			UserID: req.UserID,
-			Action: constants.MOVE,
+			GameID:  req.GameID,
+			Action:  constants.JOIN,
+			Success: false,
+			Data:    "Other player already left that game",
 		}
 
-		valid := helpers.IsTurn(activeGame, req.UserID)
-		gameOver := false
-		var message string
+		helpers.SendToClient(response, socketClient)
+		return
+	}
 
-		if !valid {
-			errorResponse := types.Request{
-				GameID:  req.GameID,
-				UserID:  req.UserID,
-				Action:  constants.MOVE,
-				Data:    "It's not your turn!",
-				Success: false,
-			}
+	player := types.Player{
+		UserID:       req.UserID,
+		SocketClient: socketClient,
+	}
 
-			helpers.SendToClient(errorResponse, socketClient)
-			return
+	activeGame.Players[req.UserID] = &player
+	activeGame.Turn = 1
+
+	activeGame.FirstPlayerId = req.UserID
+
+	opponentID := helpers.GetOpponentID(activeGame, req.UserID)
+
+	if rand.Intn(2) == 0 {
+		activeGame.FirstPlayerId = opponentID
+	}
+
+	response := types.Request{
+		GameID:   req.GameID,
+		UserID:   opponentID,
+		Action:   constants.JOIN,
+		Success:  true,
+		YourTurn: activeGame.FirstPlayerId == req.UserID,
+		Turn:     activeGame.Turn,
+	}
+
+	helpers.SendToClient(response, socketClient)
+
+	notification := types.Request{
+		GameID:   req.GameID,
+		Action:   constants.OTHERJOINED,
+		Success:  true,
+		YourTurn: activeGame.FirstPlayerId != req.UserID,
+		Turn:     activeGame.Turn,
+		UserID:   req.UserID,
+	}
+
+	helpers.SendToClient(notification, otherClient)
+}
+
+func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
+	response := types.Request{
+		GameID:  req.GameID,
+		UserID:  req.UserID,
+		Action:  constants.MESSAGE,
+		Data:    req.Data,
+		Success: true,
+	}
+
+	otherClient := helpers.OtherClient(activeGame, req.UserID)
+
+	helpers.SendToClient(response, otherClient)
+}
+
+func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
+	response := types.Request{
+		GameID: req.GameID,
+		UserID: req.UserID,
+		Action: constants.MOVE,
+	}
+
+	valid := helpers.IsTurn(activeGame, req.UserID)
+	gameOver := false
+	var message string
+
+	if !valid {
+		errorResponse := types.Request{
+			GameID:  req.GameID,
+			UserID:  req.UserID,
+			Action:  constants.MOVE,
+			Data:    "It's not your turn!",
+			Success: false,
 		}
 
-		switch turn := activeGame.Turn; turn {
-		case 1:
-			if activeGame.Turn == 1 {
-				moveStrs := strings.Split(req.Data, ", ")
-				if len(moveStrs) != 3 {
-					errorResponse := types.Request{
-						GameID:  req.GameID,
-						UserID:  req.UserID,
-						Action:  constants.MOVE,
-						Data:    "Please choose exectly three sets of two values",
-						Success: false,
-					}
+		helpers.SendToClient(errorResponse, socketClient)
+		return
+	}
 
-					helpers.SendToClient(errorResponse, socketClient)
-					return
+	switch turn := activeGame.Turn; turn {
+	case 1:
+		if activeGame.Turn == 1 {
+			moveStrs := strings.Split(req.Data, ", ")
+			if len(moveStrs) != 3 {
+				errorResponse := types.Request{
+					GameID:  req.GameID,
+					UserID:  req.UserID,
+					Action:  constants.MOVE,
+					Data:    "Please choose exectly three sets of two values",
+					Success: false,
 				}
 
-				moves := [3]types.Coord{}
-				for i, moveStr := range moveStrs {
-					ok, move, errorResponse := server.ParseMove(req, moveStr)
-
-					if !ok {
-						helpers.SendToClient(errorResponse, socketClient)
-						return
-					}
-
-					moves[i] = move
-				}
-
-				activeGame.PlayMove(moves[0], "black")
-				activeGame.PlayMove(moves[1], "black")
-				activeGame.PlayMove(moves[2], "white")
-				message = "(played black on " + moves[0].String() + ", black on " + moves[1].String() + ", and white on " + moves[2].String() + " )"
+				helpers.SendToClient(errorResponse, socketClient)
+				return
 			}
-		case 2:
-			response.Colors = make(map[string]string)
-			opponentID := helpers.GetOpponentID(activeGame, req.UserID)
 
-			if req.Data == "pass" {
-				message = "(passed and is now black -- back to player 1)"
-
-				activeGame.Players[req.UserID].Color = "black"
-				activeGame.Players[opponentID].Color = "white"
-				response.Colors[req.UserID] = "black"
-				response.Colors[opponentID] = "white"
-			} else {
-				ok, move, errorResponse := server.ParseMove(req, req.Data)
+			moves := [3]types.Coord{}
+			for i, moveStr := range moveStrs {
+				ok, move, errorResponse := server.ParseMove(req, moveStr)
 
 				if !ok {
 					helpers.SendToClient(errorResponse, socketClient)
 					return
 				}
 
-				activeGame.Players[req.UserID].Color = "white"
-				activeGame.Players[opponentID].Color = "black"
-				response.Colors[req.UserID] = "white"
-				response.Colors[opponentID] = "black"
-
-				activeGame.PlayMove(move, "white")
-				message = "(played on " + req.Data + " )"
+				moves[i] = move
 			}
-		default:
+
+			activeGame.PlayMove(moves[0], "black")
+			activeGame.PlayMove(moves[1], "black")
+			activeGame.PlayMove(moves[2], "white")
+			message = "(played black on " + moves[0].String() + ", black on " + moves[1].String() + ", and white on " + moves[2].String() + " )"
+		}
+	case 2:
+		response.Colors = make(map[string]string)
+		opponentID := helpers.GetOpponentID(activeGame, req.UserID)
+
+		if req.Data == "pass" {
+			message = "(passed and is now black -- back to player 1)"
+
+			activeGame.Players[req.UserID].Color = "black"
+			activeGame.Players[opponentID].Color = "white"
+			response.Colors[req.UserID] = "black"
+			response.Colors[opponentID] = "white"
+		} else {
 			ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 			if !ok {
@@ -312,35 +294,68 @@ func (server *Server) HandleRequest(req types.Request, socketClient *types.Socke
 				return
 			}
 
-			activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
+			activeGame.Players[req.UserID].Color = "white"
+			activeGame.Players[opponentID].Color = "black"
+			response.Colors[req.UserID] = "white"
+			response.Colors[opponentID] = "black"
 
-			gameOver = helpers.CheckForWin(activeGame, move, activeGame.Players[req.UserID].Color)
-			if gameOver {
-				activeGame.IsOver = true
-				response.GameOver = true
-				message = "won!!!! (" + req.Data + " )"
-			} else {
-				message = "(played on " + req.Data + " )"
-			}
+			activeGame.PlayMove(move, "white")
+			message = "(played on " + req.Data + " )"
+		}
+	default:
+		ok, move, errorResponse := server.ParseMove(req, req.Data)
+
+		if !ok {
+			helpers.SendToClient(errorResponse, socketClient)
+			return
 		}
 
-		response.Success = true
-		response.Board = activeGame.Board
-		response.Data = message
+		activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
 
-		if !gameOver {
-			activeGame.Turn++
-
-			response.YourTurn = false
-			response.Turn = activeGame.Turn
+		gameOver = helpers.CheckForWin(activeGame, move, activeGame.Players[req.UserID].Color)
+		if gameOver {
+			activeGame.IsOver = true
+			response.GameOver = true
+			message = "won!!!! (" + req.Data + " )"
+		} else {
+			message = "(played on " + req.Data + " )"
 		}
+	}
 
-		helpers.SendToClient(response, socketClient)
+	response.Success = true
+	response.Board = activeGame.Board
+	response.Data = message
 
-		otherClient := helpers.OtherClient(activeGame, req.UserID)
-		response.YourTurn = true
-		helpers.SendToClient(response, otherClient)
+	if !gameOver {
+		activeGame.Turn++
 
+		response.YourTurn = false
+		response.Turn = activeGame.Turn
+	}
+
+	helpers.SendToClient(response, socketClient)
+
+	otherClient := helpers.OtherClient(activeGame, req.UserID)
+	response.YourTurn = true
+	helpers.SendToClient(response, otherClient)
+}
+
+// HandleRequest handles a request
+func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
+	log.Print("Received!", socketClient, req)
+	activeGame := server.games[req.GameID]
+
+	switch action := req.Action; action {
+	case constants.CREATE:
+		server.handleCreate(req, socketClient)
+	case constants.JOIN:
+		server.handleJoin(req, socketClient, activeGame)
+	case constants.MESSAGE:
+		server.handleMessage(req, socketClient, activeGame)
+	case constants.MOVE:
+		server.handleMove(req, socketClient, activeGame)
+	case constants.HOME:
+		server.sendHome(socketClient)
 	default:
 		log.Println("Unrecognized action:", req.Action)
 	}

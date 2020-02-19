@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func main() {
+func parseEnv() (string, string, bool) {
 	clientMode := flag.Bool("play", false, "activate client mode")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -20,8 +20,13 @@ func main() {
 	}
 
 	flag.Parse()
+	return port, host, *clientMode
+}
 
-	if *clientMode == true {
+func main() {
+	port, host, clientMode := parseEnv()
+
+	if clientMode == true {
 		client := client.CreateClient()
 		client.Run(host, port)
 	} else {
