@@ -15,36 +15,34 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	serverName          = "Gomoku"
-	goingHome           = false
-	gameID              = 0
-	userID              string
-	opponentID          string
-	yourColor           string
-	opponentColor       string
-	gameOver            = false
-	connection          net.Conn
-	yourTurn            = false
-	messages            = []types.Message{}
-	turn                = 0
-	board               map[string]map[string]bool
-	turnOneInstructions = "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
-	turnTwoInstructions = "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
-)
+// Client runs the CLI for players
+type Client struct {
+	serverName    string
+	gameID        int
+	userID        string
+	opponentID    string
+	yourColor     string
+	opponentColor string
+	gameOver      bool
+	connection    net.Conn
+	yourTurn      bool
+	messages      []types.Message
+	turn          int
+	board         map[string]map[string]bool
+}
 
-func printTurn() {
+func (client *Client) printTurn() {
 	var turnStr string
 
-	if turn > 0 {
-		turnStr = "Turn #" + strconv.Itoa(turn)
-		if yourTurn {
+	if client.turn > 0 {
+		turnStr = "Turn #" + strconv.Itoa(client.turn)
+		if client.yourTurn {
 			turnStr += ": You"
 		} else {
 			turnStr += ": Opponent"
 		}
 	} else {
-		if gameOver {
+		if client.gameOver {
 			turnStr = "Game over!"
 		} else {
 			turnStr = "Waiting for player to join..."
@@ -54,12 +52,12 @@ func printTurn() {
 	fmt.Println(turnStr)
 }
 
-func printMessages() {
-	toPrint := messages
-	length := len(messages)
+func (client *Client) printMessages() {
+	toPrint := client.messages
+	length := len(client.messages)
 
 	if length > 5 {
-		toPrint = messages[length-6:]
+		toPrint = client.messages[length-6:]
 	}
 
 	for _, message := range toPrint {
@@ -67,15 +65,15 @@ func printMessages() {
 	}
 }
 
-func refreshScreen() {
+func (client *Client) refreshScreen() {
 	helpers.ClearScreen()
 
-	printTurn()
-	helpers.PrintBoard(board)
-	printMessages()
+	client.printTurn()
+	helpers.PrintBoard(client.board)
+	client.printMessages()
 }
 
-func sendToServer(request types.Request) {
+func (client *Client) sendToServer(request types.Request) {
 	data, err := helpers.GobToBytes(request)
 
 	if err != nil {
@@ -83,158 +81,165 @@ func sendToServer(request types.Request) {
 		return
 	}
 
-	connection.Write(data) // TODO: get error, handle
+	client.connection.Write(data) // TODO: get error, handle
 }
 
-func addMessage(content string, author string) {
+func (client *Client) addMessage(content string, author string) {
 	message := types.Message{
 		Content: content,
 		Author:  author,
 	}
 
-	messages = append(messages, message)
-	refreshScreen()
+	client.messages = append(client.messages, message)
+	client.refreshScreen()
 }
 
-func createGame() {
-	if gameID != 0 {
+func (client *Client) createGame() {
+	if client.gameID != 0 {
 		fmt.Println("You're already in a game!")
 		return
 	}
 
 	request := types.Request{
-		UserID: userID,
+		UserID: client.userID,
 		Action: constants.CREATE,
 	}
 
-	sendToServer(request)
+	client.sendToServer(request)
 }
 
-func joinGame(gameIDStr string) {
-	if gameID != 0 {
-		addMessage("You're already in a game!!", serverName)
+func (client *Client) joinGame(gameIDStr string) {
+	if client.gameID != 0 {
+		client.addMessage("You're already in a game!!", client.serverName)
 		return
 	}
 
 	gameID, err := strconv.Atoi(gameIDStr)
 	if err != nil {
-		addMessage("Please enter a valid integer as the game id to join!", serverName)
+		client.addMessage("Please enter a valid integer as the game id to join!", client.serverName)
 		return
 	}
 
 	request := types.Request{
 		GameID: gameID,
-		UserID: userID,
+		UserID: client.userID,
 		Action: constants.JOIN,
 	}
 
-	sendToServer(request)
+	client.sendToServer(request)
 
 }
 
-func makeMove(text string) {
-	if gameID == 0 {
-		addMessage("You're not in a game yet!", serverName)
+func (client *Client) makeMove(text string) {
+	if client.gameID == 0 {
+		client.addMessage("You're not in a game yet!", client.serverName)
 		return
 	}
 
-	if turn == 0 {
-		addMessage("The game hasn't started yet!", serverName)
+	if client.turn == 0 {
+		client.addMessage("The game hasn't started yet!", client.serverName)
 		return
 	}
 
 	request := types.Request{
-		GameID: gameID,
-		UserID: userID,
+		GameID: client.gameID,
+		UserID: client.userID,
 		Action: constants.MOVE,
 		Data:   text,
 	}
 
-	sendToServer(request)
+	client.sendToServer(request)
 }
 
-func sendMessage(text string) {
-	if gameID == 0 {
-		addMessage("You're not in a game yet!", serverName)
+func (client *Client) sendMessage(text string) {
+	if client.gameID == 0 {
+		client.addMessage("You're not in a game yet!", client.serverName)
 		return
 	}
 
-	if turn == 0 {
-		addMessage("The game hasn't started yet!", serverName)
+	if client.turn == 0 {
+		client.addMessage("The game hasn't started yet!", client.serverName)
 		return
 	}
 
 	request := types.Request{
-		GameID: gameID,
-		UserID: userID,
+		GameID: client.gameID,
+		UserID: client.userID,
 		Action: constants.MESSAGE,
 		Data:   text,
 	}
 
-	addMessage(request.Data, "You")
-	sendToServer(request)
+	client.addMessage(request.Data, "You")
+	client.sendToServer(request)
+}
+
+func (client *Client) getTurnOneInstructions() string {
+	return "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
+}
+
+func (client *Client) getTurnTwoInstructions() string {
+	return "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 }
 
 // Handler handles requests
-func Handler(message []byte) {
+func (client *Client) Handler(message []byte) {
 	request := helpers.DecodeGob(message)
 
 	switch action := request.Action; action {
 	case constants.CREATE:
 		if request.Success {
-			gameOver = false
+			client.gameOver = false
 			gameIDStr := strconv.Itoa(request.GameID)
 
-			addMessage("Created game #"+gameIDStr, serverName)
+			client.addMessage("Created game #"+gameIDStr, client.serverName)
 
-			gameID = request.GameID
-			yourTurn = true
+			client.gameID = request.GameID
+			client.yourTurn = true
 		} else {
-			addMessage("Error! Could not create game.", serverName)
+			client.addMessage("Error! Could not create game.", client.serverName)
 		}
 	case constants.JOIN:
 		if request.Success {
-			gameOver = false
-			gameID = request.GameID
+			client.gameOver = false
+			client.gameID = request.GameID
 			gameIDStr := strconv.Itoa(request.GameID)
-			opponentID = request.UserID
-			turn = request.Turn
-			yourTurn = request.YourTurn
+			client.opponentID = request.UserID
+			client.turn = request.Turn
+			client.yourTurn = request.YourTurn
 
-			addMessage("Joined game #"+gameIDStr, serverName)
-			if yourTurn {
-				addMessage(turnOneInstructions, serverName)
+			client.addMessage("Joined game #"+gameIDStr, client.serverName)
+			if client.yourTurn {
+				client.addMessage(client.getTurnOneInstructions(), client.serverName)
 			}
 		} else {
 			fmt.Println(request.Data)
 		}
 	case constants.OTHERJOINED:
 		if request.Success {
-			turn = request.Turn
-			opponentID = request.UserID
+			client.turn = request.Turn
+			client.opponentID = request.UserID
 
-			yourTurn = request.YourTurn
-			addMessage("Let the game begin!", serverName)
-			if yourTurn {
-				addMessage(turnOneInstructions, serverName)
+			client.yourTurn = request.YourTurn
+			client.addMessage("Let the game begin!", client.serverName)
+			if client.yourTurn {
+				client.addMessage(client.getTurnOneInstructions(), client.serverName)
 			}
 		}
 	case constants.MESSAGE:
 		if request.Success {
-			addMessage(request.Data, "Opponent")
+			client.addMessage(request.Data, "Opponent")
 		} else {
-			addMessage("Error! Could not parse message from opponent.", serverName)
+			client.addMessage("Error! Could not parse message from opponent.", client.serverName)
 		}
 	case constants.HOME:
-		gameOver = false
-		gameID = 0
-		goingHome = false
-		opponentID = ""
-		yourColor = ""
-		opponentColor = ""
-		messages = []types.Message{}
-		turn = 0
-		board = make(map[string]map[string]bool)
+		client.gameOver = false
+		client.gameID = 0
+		client.opponentID = ""
+		client.yourColor = ""
+		client.opponentColor = ""
+		client.messages = []types.Message{}
+		client.turn = 0
+		client.board = make(map[string]map[string]bool)
 
 		helpers.ClearScreen()
 		fmt.Println("WELCOME TO GOMOKU!")
@@ -252,55 +257,57 @@ func Handler(message []byte) {
 
 	case constants.MOVE:
 		if request.Success {
-			if turn == 2 {
-				yourColor = request.Colors[userID]
-				if yourColor == "white" {
-					opponentColor = "black"
+			if client.turn == 2 {
+				client.yourColor = request.Colors[client.userID]
+				if client.yourColor == "white" {
+					client.opponentColor = "black"
 				} else {
-					opponentColor = "white"
+					client.opponentColor = "white"
 				}
 			}
 
-			turn = request.Turn
-			board = request.Board
+			client.turn = request.Turn
+			client.board = request.Board
 
 			player := "You"
-			if request.UserID == opponentID {
+			if request.UserID == client.opponentID {
 				player = "Opponent"
 			}
 
-			gameOver = request.GameOver
-			yourTurn = request.YourTurn
+			client.gameOver = request.GameOver
+			client.yourTurn = request.YourTurn
 
-			addMessage(request.Data, player)
-			if gameOver {
-				addMessage("Type hm to go back to the main screen!", serverName)
+			client.addMessage(request.Data, player)
+			if client.gameOver {
+				client.addMessage("Type hm to go back to the main screen!", client.serverName)
 			}
 
-			if yourTurn && turn == 2 {
-				addMessage(turnTwoInstructions, serverName)
+			if client.yourTurn && client.turn == 2 {
+				client.addMessage(client.getTurnOneInstructions(), client.serverName)
 			}
 		} else {
-			addMessage(request.Data, serverName)
+			client.addMessage(request.Data, client.serverName)
 		}
 	}
 }
 
-func backToHome() {
+func (client *Client) backToHome() {
 	request := types.Request{
 		Action: constants.HOME,
 	}
 
-	sendToServer(request)
+	client.sendToServer(request)
 }
 
-func listenForInput() {
+func (client *Client) listenForInput() {
+	goingHome := false
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		text := scanner.Text()
 
 		if text == "y" && goingHome {
-			backToHome()
+			goingHome = false
+			client.backToHome()
 			continue
 		}
 
@@ -313,36 +320,36 @@ func listenForInput() {
 
 		switch action := text[:2]; action {
 		case "hp":
-			addMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", serverName)
+			client.addMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", client.serverName)
 		case "mk":
-			createGame()
+			client.createGame()
 		case "jn":
 			if len(text) < 4 {
-				addMessage("Invalid value! Type 'hp' for help!", serverName)
+				client.addMessage("Invalid value! Type 'hp' for help!", client.serverName)
 				continue
 			}
-			joinGame(text[3:])
+			client.joinGame(text[3:])
 		case "mg":
 			if len(text) < 4 {
-				addMessage("Invalid value! Type 'hp' for help!", serverName)
+				client.addMessage("Invalid value! Type 'hp' for help!", client.serverName)
 				continue
 			}
-			sendMessage(text[3:])
+			client.sendMessage(text[3:])
 		case "mv":
 			if len(text) < 4 {
-				addMessage("Invalid value! Type 'hp' for help!", serverName)
+				client.addMessage("Invalid value! Type 'hp' for help!", client.serverName)
 				continue
 			}
-			makeMove(text[3:])
+			client.makeMove(text[3:])
 		case "hm":
-			if gameOver || gameID == 0 {
-				backToHome()
+			if client.gameOver || client.gameID == 0 {
+				client.backToHome()
 				continue
 			}
 			goingHome = true
-			addMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
+			client.addMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", client.serverName)
 		default:
-			addMessage("Unrecognized command! Type 'hp' for help!", serverName)
+			client.addMessage("Unrecognized command! Type 'hp' for help!", client.serverName)
 		}
 
 		if scanner.Err() != nil {
@@ -351,12 +358,12 @@ func listenForInput() {
 	}
 }
 
-func init() {
-	board = make(map[string]map[string]bool)
+func (client *Client) init() {
+	client.board = make(map[string]map[string]bool)
 }
 
 // Run runs the client
-func Run(host string, port string) {
+func (client *Client) Run(host string, port string) {
 	helpers.InitMaps()
 
 	// create addresses
@@ -364,7 +371,7 @@ func Run(host string, port string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	userID = uuid.String()
+	client.userID = uuid.String()
 
 	fmt.Println("Connecting to host on port " + port + "...")
 	conn, err := net.Dial("tcp", host+":"+port)
@@ -372,11 +379,11 @@ func Run(host string, port string) {
 		log.Fatal(err)
 	}
 
-	connection = conn
-	client := &types.Client{Socket: connection}
+	client.connection = conn
+	socketClient := &types.SocketClient{Socket: client.connection}
 
 	connected := make(chan bool)
-	go client.Receive(Handler, &connected)
+	go socketClient.Receive(client.Handler, &connected)
 
 	select {
 	case <-connected:
@@ -385,5 +392,12 @@ func Run(host string, port string) {
 		os.Exit(1)
 	}
 
-	listenForInput()
+	client.listenForInput()
+}
+
+// CreateClient creates a client instance
+func CreateClient() Client {
+	return Client{
+		serverName: "GoGomoku",
+	}
 }

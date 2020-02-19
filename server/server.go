@@ -13,8 +13,8 @@ import (
 
 // Server handles all requests and game states
 type Server struct {
-	Games  map[int]*types.GameRoom
-	GameID int
+	games  map[int]*types.GameRoom
+	gameID int
 }
 
 // Listen starts the server
@@ -25,14 +25,14 @@ func (server *Server) Listen(port string) {
 		log.Println(error)
 	}
 
-	// create client manager
-	manager := ClientManager{
-		clients:    make(map[*types.Client]bool),
-		register:   make(chan *types.Client),
-		unregister: make(chan *types.Client),
+	// create socket socketClient manager
+	socketClientManager := SocketClientManager{
+		clients:    make(map[*types.SocketClient]bool),
+		register:   make(chan *types.SocketClient),
+		unregister: make(chan *types.SocketClient),
 	}
 
-	go manager.start()
+	go socketClientManager.start()
 
 	log.Println("Server listening on port " + port + "!")
 
@@ -42,39 +42,39 @@ func (server *Server) Listen(port string) {
 			log.Println(error)
 		}
 
-		client := &types.Client{Socket: connection, Data: make(chan []byte)}
+		socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
 
-		manager.register <- client
-		go manager.receive(client, server)
-		go manager.send(client)
+		socketClientManager.register <- socketClient
+		go socketClientManager.receive(socketClient, server)
+		go socketClientManager.send(socketClient)
 
-		server.sendHome(client)
+		server.sendHome(socketClient)
 	}
 }
 
 // CreateGame creates a game and returns the id
-func (server *Server) CreateGame(req types.Request, client *types.Client) int {
-	server.GameID++
+func (server *Server) CreateGame(req types.Request, socketClient *types.SocketClient) int {
+	server.gameID++
 	player := types.Player{
-		UserID: req.UserID,
-		Client: client,
+		UserID:       req.UserID,
+		SocketClient: socketClient,
 	}
 
 	players := make(map[string]*types.Player)
 
 	players[req.UserID] = &player
 
-	server.Games[server.GameID] = &types.GameRoom{
-		ID:      server.GameID,
+	server.games[server.gameID] = &types.GameRoom{
+		ID:      server.gameID,
 		Players: players,
 		Turn:    0,
 		Board:   make(map[string]map[string]bool),
 	}
 
-	server.Games[server.GameID].Board["white"] = make(map[string]bool)
-	server.Games[server.GameID].Board["black"] = make(map[string]bool)
+	server.games[server.gameID].Board["white"] = make(map[string]bool)
+	server.games[server.gameID].Board["black"] = make(map[string]bool)
 
-	return server.GameID
+	return server.gameID
 }
 
 // ParseMove validates the string from a mv command
@@ -116,7 +116,7 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 		Y: y,
 	}
 
-	ok, errorResponse := helpers.CheckOwnership(server.Games[req.GameID], req.UserID, move)
+	ok, errorResponse := helpers.CheckOwnership(server.games[req.GameID], req.UserID, move)
 
 	if !ok {
 		return false, types.Coord{}, errorResponse
@@ -126,13 +126,13 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 }
 
 // HandleRequest handles a request
-func (server *Server) HandleRequest(req types.Request, client *types.Client) {
-	log.Print("Received!", client, req)
-	activeGame := server.Games[req.GameID]
+func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
+	log.Print("Received!", socketClient, req)
+	activeGame := server.games[req.GameID]
 
 	switch action := req.Action; action {
 	case constants.CREATE:
-		gameID := server.CreateGame(req, client)
+		gameID := server.CreateGame(req, socketClient)
 
 		response := types.Request{
 			GameID:  gameID,
@@ -140,7 +140,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 			Success: true,
 		}
 
-		helpers.SendToClient(response, client)
+		helpers.SendToClient(response, socketClient)
 	case constants.JOIN:
 		otherClient := helpers.OtherClient(activeGame, req.UserID)
 
@@ -152,7 +152,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 				Data:    "Game is full already",
 			}
 
-			helpers.SendToClient(response, client)
+			helpers.SendToClient(response, socketClient)
 			return
 		}
 
@@ -164,13 +164,13 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 				Data:    "Other player already left that game",
 			}
 
-			helpers.SendToClient(response, client)
+			helpers.SendToClient(response, socketClient)
 			return
 		}
 
 		player := types.Player{
-			UserID: req.UserID,
-			Client: client,
+			UserID:       req.UserID,
+			SocketClient: socketClient,
 		}
 
 		activeGame.Players[req.UserID] = &player
@@ -193,7 +193,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 			Turn:     activeGame.Turn,
 		}
 
-		helpers.SendToClient(response, client)
+		helpers.SendToClient(response, socketClient)
 
 		notification := types.Request{
 			GameID:   req.GameID,
@@ -218,7 +218,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 
 		helpers.SendToClient(response, otherClient)
 	case constants.HOME:
-		server.sendHome(client)
+		server.sendHome(socketClient)
 	case constants.MOVE:
 		response := types.Request{
 			GameID: req.GameID,
@@ -239,7 +239,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 				Success: false,
 			}
 
-			helpers.SendToClient(errorResponse, client)
+			helpers.SendToClient(errorResponse, socketClient)
 			return
 		}
 
@@ -256,7 +256,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 						Success: false,
 					}
 
-					helpers.SendToClient(errorResponse, client)
+					helpers.SendToClient(errorResponse, socketClient)
 					return
 				}
 
@@ -265,7 +265,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 					ok, move, errorResponse := server.ParseMove(req, moveStr)
 
 					if !ok {
-						helpers.SendToClient(errorResponse, client)
+						helpers.SendToClient(errorResponse, socketClient)
 						return
 					}
 
@@ -292,7 +292,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 				ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 				if !ok {
-					helpers.SendToClient(errorResponse, client)
+					helpers.SendToClient(errorResponse, socketClient)
 					return
 				}
 
@@ -308,7 +308,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 			ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 			if !ok {
-				helpers.SendToClient(errorResponse, client)
+				helpers.SendToClient(errorResponse, socketClient)
 				return
 			}
 
@@ -335,7 +335,7 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 			response.Turn = activeGame.Turn
 		}
 
-		helpers.SendToClient(response, client)
+		helpers.SendToClient(response, socketClient)
 
 		otherClient := helpers.OtherClient(activeGame, req.UserID)
 		response.YourTurn = true
@@ -346,10 +346,10 @@ func (server *Server) HandleRequest(req types.Request, client *types.Client) {
 	}
 }
 
-func (server *Server) sendHome(client *types.Client) {
+func (server *Server) sendHome(socketClient *types.SocketClient) {
 	home := []types.OpenRoom{}
 
-	for _, game := range server.Games {
+	for _, game := range server.games {
 		if !game.IsOver && len(game.Players) == 1 {
 			var userID string
 			for id := range game.Players {
@@ -370,71 +370,79 @@ func (server *Server) sendHome(client *types.Client) {
 		Home:   home,
 	}
 
-	helpers.SendToClient(data, client)
+	helpers.SendToClient(data, socketClient)
 }
 
-// ClientManager handles all clients
-type ClientManager struct {
-	clients    map[*types.Client]bool
-	register   chan *types.Client
-	unregister chan *types.Client
+// SocketClientManager handles all clients
+type SocketClientManager struct {
+	clients    map[*types.SocketClient]bool
+	register   chan *types.SocketClient
+	unregister chan *types.SocketClient
 }
 
 // CloseSocket safely closes socket connection
-func CloseSocket(client *types.Client) {
-	client.M.Lock()
-	defer client.M.Unlock()
+func CloseSocket(socketClient *types.SocketClient) {
+	socketClient.M.Lock()
+	defer socketClient.M.Unlock()
 
-	if !client.Closed {
-		client.Socket.Close()
-		client.Closed = true
+	if !socketClient.Closed {
+		socketClient.Socket.Close()
+		socketClient.Closed = true
 	}
 }
 
-func (manager *ClientManager) receive(client *types.Client, server *Server) {
+func (manager *SocketClientManager) receive(socketClient *types.SocketClient, server *Server) {
 	for {
 		message := make([]byte, 4096)
-		length, err := client.Socket.Read(message)
+		length, err := socketClient.Socket.Read(message)
 
 		if length > 0 {
 			request := helpers.DecodeGob(message)
-			server.HandleRequest(request, client)
+			server.HandleRequest(request, socketClient)
 		}
 
 		if err != nil {
-			manager.unregister <- client
-			CloseSocket(client)
+			manager.unregister <- socketClient
+			CloseSocket(socketClient)
 			break
 		}
 
 	}
 }
 
-func (manager *ClientManager) send(client *types.Client) {
+func (manager *SocketClientManager) send(socketClient *types.SocketClient) {
 	for {
 		select {
-		case message, ok := <-client.Data:
+		case message, ok := <-socketClient.Data:
 			if !ok {
 				return
 			}
-			client.Socket.Write(message)
+			socketClient.Socket.Write(message)
 		}
 	}
 }
 
-func (manager *ClientManager) start() {
-	log.Println("Client manager listening for clients joining/leaving...")
+func (manager *SocketClientManager) start() {
+	log.Println("SocketClient manager listening for clients joining/leaving...")
 	for {
 		select {
-		case client := <-manager.register:
-			manager.clients[client] = true
-			log.Println("Added new client!")
-		case client := <-manager.unregister:
-			if _, ok := manager.clients[client]; ok {
-				log.Println("A client has left!")
-				close(client.Data)
-				delete(manager.clients, client)
+		case socketClient := <-manager.register:
+			manager.clients[socketClient] = true
+			log.Println("Added new socketClient!")
+		case socketClient := <-manager.unregister:
+			if _, ok := manager.clients[socketClient]; ok {
+				log.Println("A socketClient has left!")
+				close(socketClient.Data)
+				delete(manager.clients, socketClient)
 			}
 		}
+	}
+}
+
+// CreateServer creates a server instance
+func CreateServer() Server {
+	return Server{
+		games:  make(map[int]*types.GameRoom),
+		gameID: 0,
 	}
 }

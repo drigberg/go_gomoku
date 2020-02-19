@@ -7,8 +7,8 @@ import (
 	"sync"
 )
 
-// Client contains the connection to a client
-type Client struct {
+// SocketClient contains the connection to a client
+type SocketClient struct {
 	Socket net.Conn
 	Data   chan []byte
 	Closed bool
@@ -16,13 +16,13 @@ type Client struct {
 }
 
 // Receive listens for data and handles it
-func (client *Client) Receive(handler func([]byte), connected *chan bool) {
+func (socketClient *SocketClient) Receive(handler func([]byte), connected *chan bool) {
 	firstMessage := true
 	for {
 		message := make([]byte, 4096)
-		length, err := client.Socket.Read(message)
+		length, err := socketClient.Socket.Read(message)
 		if err != nil {
-			client.Socket.Close()
+			socketClient.Socket.Close()
 			break
 		}
 		if length > 0 {
@@ -90,7 +90,7 @@ type Request struct {
 }
 
 type Player struct {
-	UserID string
-	Client *Client
-	Color  string
+	UserID           string
+	SocketClient *SocketClient
+	Color            string
 }

@@ -173,11 +173,11 @@ func GetOpponentID(game *types.GameRoom, userID string) string {
 	return ""
 }
 
-// OtherClient returns the other player's client
-func OtherClient(game *types.GameRoom, userID string) *types.Client {
+// OtherClient returns the other player's client connection
+func OtherClient(game *types.GameRoom, userID string) *types.SocketClient {
 	opponentID := GetOpponentID(game, userID)
 
-	return game.Players[opponentID].Client
+	return game.Players[opponentID].SocketClient
 }
 
 // IsTurn turns if it's a user's turn or not
@@ -189,16 +189,16 @@ func IsTurn(game *types.GameRoom, userID string) bool {
 }
 
 // SendBackoff tries to send and keeps trying
-func SendBackoff(data []byte, client *types.Client, i int) {
+func SendBackoff(data []byte, socketClient *types.SocketClient, i int) {
 	if i > 1 {
 		fmt.Println("Retrying message send! Attempt:", i)
 	}
-	if client.Closed {
+	if socketClient.Closed {
 		return
 	}
 
 	select {
-	case client.Data <- data:
+	case socketClient.Data <- data:
 		return
 	default:
 		time.Sleep(500 * time.Millisecond)
@@ -206,7 +206,7 @@ func SendBackoff(data []byte, client *types.Client, i int) {
 		if i > 5 {
 			return
 		}
-		SendBackoff(data, client, i+1)
+		SendBackoff(data, socketClient, i+1)
 	}
 }
 
@@ -425,8 +425,8 @@ func InitMaps() {
 	colors["black"] = black
 }
 
-// SendToClient tries to send a request to client, with backoff
-func SendToClient(request types.Request, client *types.Client) {
+// SendToClient tries to send a request to socketClient, with backoff
+func SendToClient(request types.Request, socketClient *types.SocketClient) {
 	data, err := GobToBytes(request)
 
 	if err != nil {
@@ -434,5 +434,5 @@ func SendToClient(request types.Request, client *types.Client) {
 		return
 	}
 
-	SendBackoff(data, client, 1)
+	SendBackoff(data, socketClient, 1)
 }

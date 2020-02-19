@@ -4,7 +4,6 @@ import (
 	"flag"
 	"go_gomoku/client"
 	"go_gomoku/server"
-	"go_gomoku/types"
 	"os"
 )
 
@@ -22,13 +21,11 @@ func main() {
 
 	flag.Parse()
 
-	if *clientMode == false {
-		server := server.Server{
-			Games:  make(map[int]*types.GameRoom),
-			GameID: 0,
-		}
-		server.Listen(port)
-	} else {
+	if *clientMode == true {
+		client := client.CreateClient()
 		client.Run(host, port)
+	} else {
+		server := server.CreateServer()
+		server.Listen(port)
 	}
 }
