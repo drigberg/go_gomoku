@@ -1,12 +1,13 @@
 package constants
 
+// constants
 var (
-	HOME = "HOME"
-	FREE = "FREE"
-	MOVE = "MOVE"
-	JOIN = "JOIN"
-	OTHER_JOINED = "OTHER_JOINED"
-	CREATE = "CREATE"
-	MESSAGE = "MESSAGE"
-	SUCCESS = "SUCCESS"
+	HOME        = "HOME"
+	FREE        = "FREE"
+	MOVE        = "MOVE"
+	JOIN        = "JOIN"
+	OTHERJOINED = "OTHERJOINED"
+	CREATE      = "CREATE"
+	MESSAGE     = "MESSAGE"
+	SUCCESS     = "SUCCESS"
 )

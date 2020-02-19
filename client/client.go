@@ -1,37 +1,37 @@
-
 package client
 
 import (
 	"bufio"
 	// "io/ioutil"
+	"fmt"
+	"go_gomoku/constants"
+	"go_gomoku/helpers"
+	"go_gomoku/types"
+	"go_gomoku/util"
 	"net"
 	"os"
-	"fmt"
 	"strconv"
 	"time"
+
 	"github.com/google/uuid"
-	"go_gomoku/util"
-	"go_gomoku/types"
-	"go_gomoku/helpers"
-	"go_gomoku/constants"
 )
 
 var (
-	serverName = "Gomoku"
-	scanner = bufio.NewScanner(os.Stdin)
-	goingHome = false
-	gameId = 0
-	userId string
-	opponentId string
-	yourColor string
-	opponentColor string
-	gameOver = false
-	connection net.Conn
-	yourTurn = false
-	messages = []types.Message{}
-	connected chan bool
-	turn = 0
-	board map[string]map[string]bool
+	serverName          = "Gomoku"
+	scanner             = bufio.NewScanner(os.Stdin)
+	goingHome           = false
+	gameID              = 0
+	userID              string
+	opponentID          string
+	yourColor           string
+	opponentColor       string
+	gameOver            = false
+	connection          net.Conn
+	yourTurn            = false
+	messages            = []types.Message{}
+	connected           chan bool
+	turn                = 0
+	board               map[string]map[string]bool
 	turnOneInstructions = "You go first! Begin by placing two black pieces and then one white. Ex: 'mv 8 8, 8 7, 6 6'"
 	turnTwoInstructions = "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 )
@@ -39,9 +39,9 @@ var (
 func printTurn() {
 	var turnStr string
 
-	if (turn > 0) {
+	if turn > 0 {
 		turnStr = "Turn #" + strconv.Itoa(turn)
-		if (yourTurn) {
+		if yourTurn {
 			turnStr += ": You"
 		} else {
 			turnStr += ": Opponent"
@@ -62,15 +62,15 @@ func printMessages() {
 	length := len(messages)
 
 	if length > 5 {
-		toPrint = messages[length - 6:]
+		toPrint = messages[length-6:]
 	}
 
-	for _, message := range(toPrint) {
+	for _, message := range toPrint {
 		message.Print()
 	}
 }
 
-func RefreshScreen() {
+func refreshScreen() {
 	util.CallClear()
 
 	printTurn()
@@ -78,8 +78,7 @@ func RefreshScreen() {
 	printMessages()
 }
 
-// Send request struct to server as byte array
-func SendToServer(request types.Request) {
+func sendToServer(request types.Request) {
 	data, err := util.GobToBytes(request)
 
 	if err != nil {
@@ -90,95 +89,96 @@ func SendToServer(request types.Request) {
 	connection.Write(data) // TODO: get error, handle
 }
 
-func AddMessage(content string, author string) {
+func addMessage(content string, author string) {
 	message := types.Message{
 		Content: content,
-		Author: author,
+		Author:  author,
 	}
 
 	messages = append(messages, message)
-	RefreshScreen()
+	refreshScreen()
 }
 
-func CreateGame() {
-	if gameId != 0 {
+func createGame() {
+	if gameID != 0 {
 		fmt.Println("You're already in a game!")
 		return
 	}
 
 	request := types.Request{
-		UserId: userId,
+		UserID: userID,
 		Action: constants.CREATE,
 	}
 
-	SendToServer(request)
+	sendToServer(request)
 }
 
-func JoinGame(gameIdStr string) {
-	if gameId != 0 {
-		AddMessage("You're already in a game!!", serverName)
+func joinGame(gameIDStr string) {
+	if gameID != 0 {
+		addMessage("You're already in a game!!", serverName)
 		return
 	}
 
-	gameId, err := strconv.Atoi(gameIdStr)
+	gameID, err := strconv.Atoi(gameIDStr)
 	if err != nil {
-		AddMessage("Please enter a valid integer as the game id to join!", serverName)
+		addMessage("Please enter a valid integer as the game id to join!", serverName)
 		return
 	}
 
 	request := types.Request{
-		GameId: gameId,
-		UserId: userId,
+		GameID: gameID,
+		UserID: userID,
 		Action: constants.JOIN,
 	}
 
-	SendToServer(request)
+	sendToServer(request)
 
 }
 
-func MakeMove(text string) {
-	if gameId == 0 {
-		AddMessage("You're not in a game yet!", serverName)
+func makeMove(text string) {
+	if gameID == 0 {
+		addMessage("You're not in a game yet!", serverName)
 		return
 	}
 
 	if turn == 0 {
-		AddMessage("The game hasn't started yet!", serverName)
+		addMessage("The game hasn't started yet!", serverName)
 		return
 	}
 
 	request := types.Request{
-		GameId: gameId,
-		UserId: userId,
+		GameID: gameID,
+		UserID: userID,
 		Action: constants.MOVE,
-		Data: text,
+		Data:   text,
 	}
 
-	SendToServer(request)
+	sendToServer(request)
 }
 
-func SendMessage(text string) {
-	if gameId == 0 {
-		AddMessage("You're not in a game yet!", serverName)
+func sendMessage(text string) {
+	if gameID == 0 {
+		addMessage("You're not in a game yet!", serverName)
 		return
 	}
 
 	if turn == 0 {
-		AddMessage("The game hasn't started yet!", serverName)
+		addMessage("The game hasn't started yet!", serverName)
 		return
 	}
 
 	request := types.Request{
-		GameId: gameId,
-		UserId: userId,
+		GameID: gameID,
+		UserID: userID,
 		Action: constants.MESSAGE,
-		Data: text,
+		Data:   text,
 	}
 
-	AddMessage(request.Data, "You")
-	SendToServer(request)
+	addMessage(request.Data, "You")
+	sendToServer(request)
 }
 
+// Handler handles requests
 func Handler(message []byte) {
 	request := util.DecodeGob(message)
 
@@ -186,55 +186,55 @@ func Handler(message []byte) {
 	case constants.CREATE:
 		if request.Success {
 			gameOver = false
-			gameIdStr := strconv.Itoa(request.GameId)
+			gameIDStr := strconv.Itoa(request.GameID)
 
-			AddMessage("Created game #" + gameIdStr, serverName)
+			addMessage("Created game #"+gameIDStr, serverName)
 
-			gameId = request.GameId
+			gameID = request.GameID
 			yourTurn = true
 		} else {
-			AddMessage("Error! Could not create game.", serverName)
+			addMessage("Error! Could not create game.", serverName)
 		}
 	case constants.JOIN:
-			if request.Success {
-				gameOver = false
-				gameId = request.GameId
-				gameIdStr := strconv.Itoa(request.GameId)
-				opponentId = request.UserId
-				turn = request.Turn
-				yourTurn = request.YourTurn
+		if request.Success {
+			gameOver = false
+			gameID = request.GameID
+			gameIDStr := strconv.Itoa(request.GameID)
+			opponentID = request.UserID
+			turn = request.Turn
+			yourTurn = request.YourTurn
 
-				AddMessage("Joined game #" + gameIdStr, serverName)
-				if yourTurn {
-					AddMessage(turnOneInstructions, serverName)
-				}
-			} else {
-				fmt.Println(request.Data)
+			addMessage("Joined game #"+gameIDStr, serverName)
+			if yourTurn {
+				addMessage(turnOneInstructions, serverName)
 			}
-	case constants.OTHER_JOINED:
+		} else {
+			fmt.Println(request.Data)
+		}
+	case constants.OTHERJOINED:
 		if request.Success {
 			turn = request.Turn
-			opponentId = request.UserId
+			opponentID = request.UserID
 
 			yourTurn = request.YourTurn
-			AddMessage("Let the game begin!", serverName)
+			addMessage("Let the game begin!", serverName)
 			if yourTurn {
-				AddMessage(turnOneInstructions, serverName)
+				addMessage(turnOneInstructions, serverName)
 			}
 		}
 	case constants.MESSAGE:
 		if request.Success {
-			AddMessage(request.Data, "Opponent")
+			addMessage(request.Data, "Opponent")
 		} else {
-			AddMessage("Error! Could not parse message from opponent.", serverName)
+			addMessage("Error! Could not parse message from opponent.", serverName)
 		}
 	case constants.HOME:
 		go func() { connected <- true }()
 
 		gameOver = false
-		gameId = 0
+		gameID = 0
 		goingHome = false
-		opponentId = ""
+		opponentID = ""
 		yourColor = ""
 		opponentColor = ""
 		messages = []types.Message{}
@@ -250,16 +250,15 @@ func Handler(message []byte) {
 			fmt.Println("(type hm to refresh)")
 			fmt.Println("_________")
 
-			for _, game := range(request.Home) {
-				fmt.Println("Game Id: " + strconv.Itoa(game.Id) + " ----- User: " + game.UserId)
+			for _, game := range request.Home {
+				fmt.Println("Game ID: " + strconv.Itoa(game.ID) + " ----- User: " + game.UserID)
 			}
 		}
-
 
 	case constants.MOVE:
 		if request.Success {
 			if turn == 2 {
-				yourColor = request.Colors[userId]
+				yourColor = request.Colors[userID]
 				if yourColor == "white" {
 					opponentColor = "black"
 				} else {
@@ -271,41 +270,41 @@ func Handler(message []byte) {
 			board = request.Board
 
 			player := "You"
-			if request.UserId == opponentId {
+			if request.UserID == opponentID {
 				player = "Opponent"
 			}
 
 			gameOver = request.GameOver
 			yourTurn = request.YourTurn
 
-			AddMessage(request.Data, player)
+			addMessage(request.Data, player)
 			if gameOver {
-				AddMessage("Type hm to go back to the main screen!", serverName)
+				addMessage("Type hm to go back to the main screen!", serverName)
 			}
 
 			if yourTurn && turn == 2 {
-				AddMessage(turnTwoInstructions, serverName)
+				addMessage(turnTwoInstructions, serverName)
 			}
 		} else {
-			AddMessage(request.Data, serverName)
+			addMessage(request.Data, serverName)
 		}
 	}
 }
 
-func BackToHome() {
+func backToHome() {
 	request := types.Request{
 		Action: constants.HOME,
 	}
 
-	SendToServer(request)
+	sendToServer(request)
 }
 
-func ListenForInput() {
+func listenForInput() {
 	for scanner.Scan() {
 		text := scanner.Text()
 
 		if text == "y" && goingHome {
-			BackToHome()
+			backToHome()
 			continue
 		}
 
@@ -318,40 +317,40 @@ func ListenForInput() {
 
 		switch action := text[:2]; action {
 		case "hp":
-			AddMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", serverName)
+			addMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", serverName)
 		case "mk":
-			CreateGame()
+			createGame()
 		case "jn":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", serverName)
+				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
-			JoinGame(text[3:])
+			joinGame(text[3:])
 		case "mg":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", serverName)
+				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
-			SendMessage(text[3:])
+			sendMessage(text[3:])
 		case "mv":
 			if len(text) < 4 {
-				AddMessage("Invalid value! Type 'hp' for help!", serverName)
+				addMessage("Invalid value! Type 'hp' for help!", serverName)
 				continue
 			}
 
-			MakeMove(text[3:])
+			makeMove(text[3:])
 		case "hm":
-			if gameOver || gameId == 0 {
-				BackToHome()
+			if gameOver || gameID == 0 {
+				backToHome()
 				continue
 			}
 
 			goingHome = true
-			AddMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
+			addMessage("Are you sure you want to leave the game? Type y if you DEFINITELY want to go back to the home screen.", serverName)
 		default:
-			AddMessage("Unrecognized command! Type 'hp' for help!", serverName)
+			addMessage("Unrecognized command! Type 'hp' for help!", serverName)
 		}
 
 		if scanner.Err() != nil {
@@ -360,7 +359,8 @@ func ListenForInput() {
 	}
 }
 
-func Run(host *string, port string) {
+// Run runs the client
+func Run(host string, port string) {
 	connected = make(chan bool)
 	helpers.InitMaps()
 
@@ -369,13 +369,13 @@ func Run(host *string, port string) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	userId = uuid.String()
+	userID = uuid.String()
 
 	fmt.Println("Connecting to host on port " + port + "...")
 
-	conn, err := net.Dial("tcp", *host + ":" + port)
+	conn, err := net.Dial("tcp", host+":"+port)
 	if err != nil {
-			fmt.Println(err)
+		fmt.Println(err)
 	}
 
 	connection = conn
@@ -387,11 +387,11 @@ func Run(host *string, port string) {
 	board = make(map[string]map[string]bool)
 
 	select {
-	case <- connected:
-	case <- time.After(5 * time.Second):
+	case <-connected:
+	case <-time.After(5 * time.Second):
 		fmt.Println("Could not connect!")
 		os.Exit(1)
 	}
 
-	ListenForInput()
+	listenForInput()
 }
