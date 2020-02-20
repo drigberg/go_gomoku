@@ -55,21 +55,6 @@ func (message Message) Print() {
 	fmt.Println(output)
 }
 
-type GameRoom struct {
-	ID            int
-	Players       map[string]*Player
-	Turn          int
-	Board         map[string]map[string]bool
-	FirstPlayerId string
-	IsOver        bool
-}
-
-func (game GameRoom) PlayMove(move Coord, color string) {
-	moveStr := move.String()
-
-	game.Board[color][moveStr] = true
-}
-
 type OpenRoom struct {
 	ID     int
 	UserID string
@@ -90,7 +75,7 @@ type Request struct {
 }
 
 type Player struct {
-	UserID           string
+	UserID       string
 	SocketClient *SocketClient
-	Color            string
+	Color        string
 }

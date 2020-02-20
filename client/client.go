@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"fmt"
+	"go_gomoku/board"
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
@@ -28,7 +29,7 @@ type Client struct {
 	yourTurn      bool
 	messages      []types.Message
 	turn          int
-	board         map[string]map[string]bool
+	board         board.Board
 }
 
 // New creates a client instance
@@ -41,18 +42,18 @@ func New(serverName string) Client {
 func (client *Client) printTurn() {
 	var turnStr string
 
-	if client.turn > 0 {
+	if client.turn == 0 {
+		if client.gameOver {
+			turnStr = "Game over!"
+		} else {
+			turnStr = "Waiting for player to join..."
+		}
+	} else {
 		turnStr = "Turn #" + strconv.Itoa(client.turn)
 		if client.yourTurn {
 			turnStr += ": You"
 		} else {
 			turnStr += ": Opponent"
-		}
-	} else {
-		if client.gameOver {
-			turnStr = "Game over!"
-		} else {
-			turnStr = "Waiting for player to join..."
 		}
 	}
 
@@ -76,7 +77,7 @@ func (client *Client) refreshScreen() {
 	helpers.ClearScreen()
 
 	client.printTurn()
-	helpers.PrintBoard(client.board)
+	client.board.PrintBoard()
 	client.printMessages()
 }
 
@@ -180,7 +181,7 @@ func (client *Client) getTurnTwoInstructions() string {
 	return "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 }
 
-func (client *Client) handleCreate(request types.Request) {
+func (client *Client) handleCreateRequest(request types.Request) {
 	if request.Success {
 		client.gameOver = false
 		gameIDStr := strconv.Itoa(request.GameID)
@@ -194,7 +195,7 @@ func (client *Client) handleCreate(request types.Request) {
 	}
 }
 
-func (client *Client) handleJoin(request types.Request) {
+func (client *Client) handleJoinRequest(request types.Request) {
 	if request.Success {
 		client.gameOver = false
 		client.gameID = request.GameID
@@ -212,7 +213,7 @@ func (client *Client) handleJoin(request types.Request) {
 	}
 }
 
-func (client *Client) handleOtherJoined(request types.Request) {
+func (client *Client) handleOtherJoinedRequest(request types.Request) {
 	if request.Success {
 		client.turn = request.Turn
 		client.opponentID = request.UserID
@@ -225,7 +226,7 @@ func (client *Client) handleOtherJoined(request types.Request) {
 	}
 }
 
-func (client *Client) handleMessage(request types.Request) {
+func (client *Client) handleMessageRequest(request types.Request) {
 	if request.Success {
 		client.addMessage(request.Data, "Opponent")
 	} else {
@@ -233,7 +234,7 @@ func (client *Client) handleMessage(request types.Request) {
 	}
 }
 
-func (client *Client) handleHome(request types.Request) {
+func (client *Client) handleHomeRequest(request types.Request) {
 	client.gameOver = false
 	client.gameID = 0
 	client.opponentID = ""
@@ -241,7 +242,7 @@ func (client *Client) handleHome(request types.Request) {
 	client.opponentColor = ""
 	client.messages = []types.Message{}
 	client.turn = 0
-	client.board = make(map[string]map[string]bool)
+	client.board = board.New()
 
 	helpers.ClearScreen()
 	fmt.Println("WELCOME TO GOMOKU!")
@@ -258,7 +259,7 @@ func (client *Client) handleHome(request types.Request) {
 	}
 }
 
-func (client *Client) handleMove(request types.Request) {
+func (client *Client) handleMoveRequest(request types.Request) {
 	if request.Success {
 		if client.turn == 2 {
 			client.yourColor = request.Colors[client.userID]
@@ -270,7 +271,7 @@ func (client *Client) handleMove(request types.Request) {
 		}
 
 		client.turn = request.Turn
-		client.board = request.Board
+		client.board.Spaces = request.Board
 
 		player := "You"
 		if request.UserID == client.opponentID {
@@ -286,7 +287,7 @@ func (client *Client) handleMove(request types.Request) {
 		}
 
 		if client.yourTurn && client.turn == 2 {
-			client.addMessage(client.getTurnOneInstructions(), client.serverName)
+			client.addMessage(client.getTurnTwoInstructions(), client.serverName)
 		}
 	} else {
 		client.addMessage(request.Data, client.serverName)
@@ -299,17 +300,17 @@ func (client *Client) Handler(message []byte) {
 
 	switch action := request.Action; action {
 	case constants.CREATE:
-		client.handleCreate(request)
+		client.handleCreateRequest(request)
 	case constants.JOIN:
-		client.handleJoin(request)
+		client.handleJoinRequest(request)
 	case constants.OTHERJOINED:
-		client.handleOtherJoined(request)
+		client.handleOtherJoinedRequest(request)
 	case constants.MESSAGE:
-		client.handleMessage(request)
+		client.handleMessageRequest(request)
 	case constants.HOME:
-		client.handleHome(request)
+		client.handleHomeRequest(request)
 	case constants.MOVE:
-		client.handleMove(request)
+		client.handleMoveRequest(request)
 	}
 }
 
@@ -381,13 +382,11 @@ func (client *Client) listenForInput() {
 }
 
 func (client *Client) init() {
-	client.board = make(map[string]map[string]bool)
+	client.board = board.New()
 }
 
-// Run runs the client
+// Run begins the CLI and connects to the server
 func (client *Client) Run(host string, port string) {
-	helpers.InitMaps()
-
 	// create addresses
 	uuid, err := uuid.NewUUID()
 	if err != nil {

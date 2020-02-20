@@ -1,6 +1,7 @@
 package server
 
 import (
+	"go_gomoku/board"
 	"go_gomoku/constants"
 	"go_gomoku/helpers"
 	"go_gomoku/types"
@@ -11,9 +12,51 @@ import (
 	"strings"
 )
 
+// GameRoom contains all info related to a room
+type GameRoom struct {
+	ID            int
+	Players       map[string]*types.Player
+	Turn          int
+	Board         board.Board
+	FirstPlayerID string
+	IsOver        bool
+}
+
+// PlayMove places a piece
+func (game GameRoom) PlayMove(move types.Coord, color string) {
+	moveStr := move.String()
+
+	game.Board.Spaces[color][moveStr] = true
+}
+
+// GetOpponentID returns the other player's id
+func GetOpponentID(game *GameRoom, userID string) string {
+	for id := range game.Players {
+		if id != userID {
+			return id
+		}
+	}
+	return ""
+}
+
+// OtherClient returns the other player's client connection
+func OtherClient(game *GameRoom, userID string) *types.SocketClient {
+	opponentID := GetOpponentID(game, userID)
+
+	return game.Players[opponentID].SocketClient
+}
+
+// IsTurn turns if it's a user's turn or not
+func IsTurn(game *GameRoom, userID string) bool {
+	if userID == game.FirstPlayerID {
+		return game.Turn%2 == 1
+	}
+	return game.Turn%2 == 0
+}
+
 // Server handles all requests and game states
 type Server struct {
-	games  map[int]*types.GameRoom
+	games  map[int]*GameRoom
 	gameID int
 }
 
@@ -55,7 +98,7 @@ func (server *Server) Listen(port string) {
 // New creates a server instances
 func New() Server {
 	return Server{
-		games:  make(map[int]*types.GameRoom),
+		games:  make(map[int]*GameRoom),
 		gameID: 0,
 	}
 }
@@ -72,15 +115,12 @@ func (server *Server) CreateGame(req types.Request, socketClient *types.SocketCl
 
 	players[req.UserID] = &player
 
-	server.games[server.gameID] = &types.GameRoom{
+	server.games[server.gameID] = &GameRoom{
 		ID:      server.gameID,
 		Players: players,
 		Turn:    0,
-		Board:   make(map[string]map[string]bool),
+		Board:   board.New(),
 	}
-
-	server.games[server.gameID].Board["white"] = make(map[string]bool)
-	server.games[server.gameID].Board["black"] = make(map[string]bool)
 
 	return server.gameID
 }
@@ -124,7 +164,7 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 		Y: y,
 	}
 
-	ok, errorResponse := helpers.CheckOwnership(server.games[req.GameID], req.UserID, move)
+	ok, errorResponse := server.games[req.GameID].Board.CheckOwnership(req.GameID, req.UserID, move)
 	if !ok {
 		return false, types.Coord{}, errorResponse
 	}
@@ -142,8 +182,8 @@ func (server *Server) handleCreate(req types.Request, socketClient *types.Socket
 	helpers.SendToClient(response, socketClient)
 }
 
-func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
-	otherClient := helpers.OtherClient(activeGame, req.UserID)
+func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
+	otherClient := OtherClient(activeGame, req.UserID)
 
 	if len(activeGame.Players) == 2 {
 		response := types.Request{
@@ -176,10 +216,10 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 
 	activeGame.Players[req.UserID] = &player
 	activeGame.Turn = 1
-	activeGame.FirstPlayerId = req.UserID
-	opponentID := helpers.GetOpponentID(activeGame, req.UserID)
+	activeGame.FirstPlayerID = req.UserID
+	opponentID := GetOpponentID(activeGame, req.UserID)
 	if rand.Intn(2) == 0 {
-		activeGame.FirstPlayerId = opponentID
+		activeGame.FirstPlayerID = opponentID
 	}
 
 	response := types.Request{
@@ -187,14 +227,14 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		UserID:   opponentID,
 		Action:   constants.JOIN,
 		Success:  true,
-		YourTurn: activeGame.FirstPlayerId == req.UserID,
+		YourTurn: activeGame.FirstPlayerID == req.UserID,
 		Turn:     activeGame.Turn,
 	}
 	notification := types.Request{
 		GameID:   req.GameID,
 		Action:   constants.OTHERJOINED,
 		Success:  true,
-		YourTurn: activeGame.FirstPlayerId != req.UserID,
+		YourTurn: activeGame.FirstPlayerID != req.UserID,
 		Turn:     activeGame.Turn,
 		UserID:   req.UserID,
 	}
@@ -203,7 +243,7 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 	helpers.SendToClient(notification, otherClient)
 }
 
-func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
+func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
 	response := types.Request{
 		GameID:  req.GameID,
 		UserID:  req.UserID,
@@ -212,19 +252,19 @@ func (server *Server) handleMessage(req types.Request, socketClient *types.Socke
 		Success: true,
 	}
 
-	otherClient := helpers.OtherClient(activeGame, req.UserID)
+	otherClient := OtherClient(activeGame, req.UserID)
 
 	helpers.SendToClient(response, otherClient)
 }
 
-func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *types.GameRoom) {
+func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
 	response := types.Request{
 		GameID: req.GameID,
 		UserID: req.UserID,
 		Action: constants.MOVE,
 	}
 
-	valid := helpers.IsTurn(activeGame, req.UserID)
+	valid := IsTurn(activeGame, req.UserID)
 	gameOver := false
 	var message string
 
@@ -277,7 +317,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 		}
 	case 2:
 		response.Colors = make(map[string]string)
-		opponentID := helpers.GetOpponentID(activeGame, req.UserID)
+		opponentID := GetOpponentID(activeGame, req.UserID)
 
 		if req.Data == "pass" {
 			message = "(passed and is now black -- back to player 1)"
@@ -312,7 +352,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 
 		activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
 
-		gameOver = helpers.CheckForWin(activeGame, move, activeGame.Players[req.UserID].Color)
+		gameOver = activeGame.Board.CheckForWin(move, activeGame.Players[req.UserID].Color)
 		if gameOver {
 			activeGame.IsOver = true
 			response.GameOver = true
@@ -323,7 +363,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 	}
 
 	response.Success = true
-	response.Board = activeGame.Board
+	response.Board = activeGame.Board.Spaces
 	response.Data = message
 
 	if !gameOver {
@@ -335,7 +375,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 
 	helpers.SendToClient(response, socketClient)
 
-	otherClient := helpers.OtherClient(activeGame, req.UserID)
+	otherClient := OtherClient(activeGame, req.UserID)
 	response.YourTurn = true
 	helpers.SendToClient(response, otherClient)
 }
