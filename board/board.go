@@ -98,17 +98,13 @@ func (board *Board) checkAlongAxis(color string, axis [2]int, move types.Coord, 
 	return num
 }
 
-// CheckForWin looks for five in a row
+// CheckForWin looks for five in a row from a position
 func (board *Board) CheckForWin(move types.Coord, color string) bool {
 	// check within color from move coordinates
 	for _, axis := range axes {
-		fmt.Print("\n\n")
-
 		len := board.checkAlongAxis(color, axis, move, 1)
-		fmt.Println(len)
 		complement := [2]int{axis[0] * -1, axis[1] * -1}
 		len = board.checkAlongAxis(color, complement, move, len)
-		fmt.Println(len)
 
 		if len == 5 {
 			return true
