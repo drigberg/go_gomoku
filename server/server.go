@@ -52,6 +52,14 @@ func (server *Server) Listen(port string) {
 	}
 }
 
+// New creates a server instances
+func New() Server {
+	return Server{
+		games:  make(map[int]*types.GameRoom),
+		gameID: 0,
+	}
+}
+
 // CreateGame creates a game and returns the id
 func (server *Server) CreateGame(req types.Request, socketClient *types.SocketClient) int {
 	server.gameID++
@@ -443,13 +451,5 @@ func (manager *SocketClientManager) start() {
 				delete(manager.clients, socketClient)
 			}
 		}
-	}
-}
-
-// CreateServer creates a server instance
-func CreateServer() Server {
-	return Server{
-		games:  make(map[int]*types.GameRoom),
-		gameID: 0,
 	}
 }

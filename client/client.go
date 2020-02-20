@@ -31,6 +31,13 @@ type Client struct {
 	board         map[string]map[string]bool
 }
 
+// New creates a client instance
+func New(serverName string) Client {
+	return Client{
+		serverName: serverName,
+	}
+}
+
 func (client *Client) printTurn() {
 	var turnStr string
 
@@ -408,11 +415,4 @@ func (client *Client) Run(host string, port string) {
 	}
 
 	client.listenForInput()
-}
-
-// CreateClient creates a client instance
-func CreateClient() Client {
-	return Client{
-		serverName: "GoGomoku",
-	}
 }

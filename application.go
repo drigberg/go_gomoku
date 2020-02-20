@@ -27,10 +27,10 @@ func main() {
 	port, host, clientMode := parseEnv()
 
 	if clientMode == true {
-		client := client.CreateClient()
+		client := client.New("GoGomoku")
 		client.Run(host, port)
 	} else {
-		server := server.CreateServer()
+		server := server.New()
 		server.Listen(port)
 	}
 }
