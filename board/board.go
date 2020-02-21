@@ -38,6 +38,24 @@ type Board struct {
 	Spaces map[string]map[string]bool
 }
 
+// Interface defines methods a Board should implement
+type Interface interface {
+	CheckForWin(types.Coord, string) bool
+	CheckOwnership(int, string, types.Coord) (bool, types.Request)
+	PrintBoard()
+	checkAlongAxis(string, [2]int, types.Coord, int) int
+	getAxisLabel(int, int) string
+	getColorCode(string) string
+	getColumnChar(int, int) string
+	getCoord(int, int) types.Coord
+	getRowChar(int, int, string, string) string
+	intersectionOrSpace(string, string, string, bool) string
+	isTakenBy(types.Coord) string
+}
+
+// assert that Board implements Interface
+var _ Interface = (*Board)(nil)
+
 // New creates an empty board
 func New() Board {
 	spaces := make(map[string]map[string]bool)
