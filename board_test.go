@@ -81,7 +81,7 @@ type BoardCheckForWinSuccessTestCase struct {
 	expectedWinningCoords []types.Coord
 }
 
-func TestBoardCheckForWinSuccessWhite(t *testing.T) {
+func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 	testcases := []BoardCheckForWinSuccessTestCase{
 		BoardCheckForWinSuccessTestCase{
 			"horizontal",
@@ -128,6 +128,11 @@ func TestBoardCheckForWinSuccessWhite(t *testing.T) {
 			},
 		},
 	}
+	return testcases
+}
+
+func TestBoardCheckForWinSuccessWhite(t *testing.T) {
+	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
 			gameBoard := board.New()
@@ -149,52 +154,7 @@ func TestBoardCheckForWinSuccessWhite(t *testing.T) {
 }
 
 func TestBoardCheckForWinSuccessBlack(t *testing.T) {
-	testcases := []BoardCheckForWinSuccessTestCase{
-		BoardCheckForWinSuccessTestCase{
-			"horizontal",
-			[]string{"3 3", "4 3", "5 3", "6 3", "7 3"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 4, Y: 3},
-				types.Coord{X: 5, Y: 3},
-				types.Coord{X: 6, Y: 3},
-				types.Coord{X: 7, Y: 3},
-			},
-		},
-		BoardCheckForWinSuccessTestCase{
-			"diagonal_right",
-			[]string{"3 3", "4 4", "5 5", "6 6", "7 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 4, Y: 4},
-				types.Coord{X: 5, Y: 5},
-				types.Coord{X: 6, Y: 6},
-				types.Coord{X: 7, Y: 7},
-			},
-		},
-		BoardCheckForWinSuccessTestCase{
-			"vertical",
-			[]string{"3 3", "3 4", "3 5", "3 6", "3 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 3, Y: 4},
-				types.Coord{X: 3, Y: 5},
-				types.Coord{X: 3, Y: 6},
-				types.Coord{X: 3, Y: 7},
-			},
-		},
-		BoardCheckForWinSuccessTestCase{
-			"diagonal_left",
-			[]string{"7 3", "6 4", "5 5", "4 6", "3 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 7},
-				types.Coord{X: 4, Y: 6},
-				types.Coord{X: 5, Y: 5},
-				types.Coord{X: 6, Y: 4},
-				types.Coord{X: 7, Y: 3},
-			},
-		},
-	}
+	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
 			gameBoard := board.New()

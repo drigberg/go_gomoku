@@ -18,6 +18,8 @@ import (
 
 // Client runs the CLI for players
 type Client struct {
+	DisablePrint  bool
+	Messages      []types.Message
 	serverName    string
 	gameID        int
 	userID        string
@@ -27,7 +29,6 @@ type Client struct {
 	gameOver      bool
 	connection    net.Conn
 	yourTurn      bool
-	messages      []types.Message
 	turn          int
 	board         board.Board
 }
@@ -36,6 +37,18 @@ type Client struct {
 func New(serverName string) Client {
 	return Client{
 		serverName: serverName,
+	}
+}
+
+func (client *Client) printString(message string) {
+	if !client.DisablePrint {
+		fmt.Println(message)
+	}
+}
+
+func (client *Client) printError(err error) {
+	if !client.DisablePrint {
+		fmt.Println(err)
 	}
 }
 
@@ -57,15 +70,13 @@ func (client *Client) printTurn() {
 		}
 	}
 
-	fmt.Println(turnStr)
+	client.printString(turnStr)
 }
 
 func (client *Client) printMessages() {
-	toPrint := client.messages
-	length := len(client.messages)
-
+	toPrint := client.Messages
+	length := len(client.Messages)
 	if length > 5 {
-		toPrint = client.messages[length-6:]
 	}
 
 	for _, message := range toPrint {
@@ -74,18 +85,19 @@ func (client *Client) printMessages() {
 }
 
 func (client *Client) refreshScreen() {
-	helpers.ClearScreen()
-
-	client.printTurn()
-	client.board.PrintBoard()
-	client.printMessages()
+	if !client.DisablePrint {
+		helpers.ClearScreen()
+		client.printTurn()
+		client.board.PrintBoard()
+		client.printMessages()
+	}
 }
 
 func (client *Client) sendToServer(request types.Request) {
 	data, err := helpers.GobToBytes(request)
 
 	if err != nil {
-		fmt.Println(err)
+		client.printError(err)
 		return
 	}
 
@@ -98,13 +110,13 @@ func (client *Client) addMessage(content string, author string) {
 		Author:  author,
 	}
 
-	client.messages = append(client.messages, message)
+	client.Messages = append(client.Messages, message)
 	client.refreshScreen()
 }
 
 func (client *Client) createGame() {
 	if client.gameID != 0 {
-		fmt.Println("You're already in a game!")
+		client.printString("You're already in a game!")
 		return
 	}
 
@@ -209,7 +221,7 @@ func (client *Client) handleJoinRequest(request types.Request) {
 			client.addMessage(client.getTurnOneInstructions(), client.serverName)
 		}
 	} else {
-		fmt.Println(request.Data)
+		client.printString(request.Data)
 	}
 }
 
@@ -240,21 +252,21 @@ func (client *Client) handleHomeRequest(request types.Request) {
 	client.opponentID = ""
 	client.yourColor = ""
 	client.opponentColor = ""
-	client.messages = []types.Message{}
+	client.Messages = []types.Message{}
 	client.turn = 0
 	client.board = board.New()
 
 	helpers.ClearScreen()
-	fmt.Println("WELCOME TO GOMOKU!")
+	client.printString("WELCOME TO GOMOKU!")
 	if len(request.Home) == 0 {
-		fmt.Println("No open games! Type 'mk' to make a new game!")
+		client.printString("No open games! Type 'mk' to make a new game!")
 	} else {
-		fmt.Println("Open Games")
-		fmt.Println("(type hm to refresh)")
-		fmt.Println("_________")
+		client.printString("Open Games")
+		client.printString("(type hm to refresh)")
+		client.printString("_________")
 
 		for _, game := range request.Home {
-			fmt.Println("Game ID: " + strconv.Itoa(game.ID) + " ----- User: " + game.UserID)
+			client.printString("Game ID: " + strconv.Itoa(game.ID) + " ----- User: " + game.UserID)
 		}
 	}
 }
@@ -312,6 +324,7 @@ func (client *Client) Handler(message []byte) {
 	case constants.MOVE:
 		client.handleMoveRequest(request)
 	}
+	client.refreshScreen()
 }
 
 func (client *Client) backToHome() {
@@ -381,10 +394,6 @@ func (client *Client) listenForInput() {
 	}
 }
 
-func (client *Client) init() {
-	client.board = board.New()
-}
-
 // Run begins the CLI and connects to the server
 func (client *Client) Run(host string, port string) {
 	// create addresses
@@ -394,7 +403,7 @@ func (client *Client) Run(host string, port string) {
 	}
 	client.userID = uuid.String()
 
-	fmt.Println("Connecting to host on port " + port + "...")
+	client.printString("Connecting to host on port " + port + "...")
 	conn, err := net.Dial("tcp", host+":"+port)
 	if err != nil {
 		log.Fatal(err)
@@ -409,7 +418,7 @@ func (client *Client) Run(host string, port string) {
 	select {
 	case <-connected:
 	case <-time.After(5 * time.Second):
-		fmt.Println("Could not connect!")
+		client.printString("Could not connect!")
 		os.Exit(1)
 	}
 
