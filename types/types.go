@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"sync"
@@ -50,11 +49,6 @@ type Message struct {
 	Author  string
 }
 
-func (message Message) Print() {
-	output := message.Author + ": " + message.Content
-	fmt.Println(output)
-}
-
 type OpenRoom struct {
 	ID     int
 	UserID string
@@ -66,10 +60,10 @@ type Request struct {
 	Action   string
 	Success  bool
 	GameOver bool
-	Colors   map[string]string
 	Data     string
 	YourTurn bool
 	Turn     int
+	Colors   map[string]string
 	Board    map[string]map[string]bool
 	Home     []OpenRoom
 }

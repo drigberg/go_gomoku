@@ -1,7 +1,6 @@
-package main
+package board
 
 import (
-	"go_gomoku/board"
 	"go_gomoku/types"
 	"testing"
 )
@@ -25,7 +24,7 @@ func coordSlicesAreEqual(slice1 *[]types.Coord, slice2 *[]types.Coord) bool {
 	return true
 }
 
-func getWinningCoordsSlices(gameBoard *board.Board) (*[]types.Coord, *[]types.Coord) {
+func getWinningCoordsSlices(gameBoard *Board) (*[]types.Coord, *[]types.Coord) {
 	winningCoordsWhite := []types.Coord{}
 	winningCoordsBlack := []types.Coord{}
 	for x := 0; x < 15; x++ {
@@ -43,7 +42,7 @@ func getWinningCoordsSlices(gameBoard *board.Board) (*[]types.Coord, *[]types.Co
 }
 
 func TestBoardNew(t *testing.T) {
-	gameBoard := board.New()
+	gameBoard := New()
 	if gameBoard.Spaces == nil {
 		t.Error("Expected board.Spaces to not be nil")
 	}
@@ -65,7 +64,7 @@ func TestBoardNew(t *testing.T) {
 }
 
 func TestBoardCheckForWinEmpty(t *testing.T) {
-	gameBoard := board.New()
+	gameBoard := New()
 	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
 	if len(*winningCoordsWhite) > 0 {
 		t.Errorf("Expected no winning spaces for white, found %d", len(*winningCoordsWhite))
@@ -135,7 +134,7 @@ func TestBoardCheckForWinSuccessWhite(t *testing.T) {
 	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
-			gameBoard := board.New()
+			gameBoard := New()
 			for _, coordString := range testcase.coordStrings {
 				gameBoard.Spaces["white"][coordString] = true
 			}
@@ -157,7 +156,7 @@ func TestBoardCheckForWinSuccessBlack(t *testing.T) {
 	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
-			gameBoard := board.New()
+			gameBoard := New()
 			for _, coordString := range testcase.coordStrings {
 				gameBoard.Spaces["black"][coordString] = true
 			}

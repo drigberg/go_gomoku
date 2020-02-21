@@ -19,7 +19,7 @@ import (
 // Client runs the CLI for players
 type Client struct {
 	DisablePrint  bool
-	Messages      []types.Message
+	messages      []types.Message
 	serverName    string
 	gameID        int
 	userID        string
@@ -33,10 +33,55 @@ type Client struct {
 	board         board.Board
 }
 
+// Interface defines methods a Client should implement
+type Interface interface {
+	Run(string, string)
+	Handler([]byte)
+	addMessage(string, string)
+	backToHome()
+	clearScreen()
+	createGame()
+	getTurnOneInstructions() string
+	getTurnTwoInstructions() string
+	handleCreateRequest(types.Request)
+	handleHomeRequest(types.Request)
+	handleJoinRequest(types.Request)
+	handleMessageRequest(types.Request)
+	handleMoveRequest(types.Request)
+	handleOtherJoinedRequest(types.Request)
+	joinGame(string)
+	listenForInput()
+	makeMove(string)
+	printBoard()
+	printBoardAndMessages()
+	printError(err error)
+	printHomeScreen(types.Request)
+	printMessages()
+	printString(message string)
+	printTurn()
+	sendMessage(string)
+	sendToServer(types.Request)
+}
+
+// assert that Board implements Interface
+var _ Interface = (*Client)(nil)
+
 // New creates a client instance
 func New(serverName string) Client {
 	return Client{
 		serverName: serverName,
+	}
+}
+
+func (client *Client) clearScreen() {
+	if !client.DisablePrint {
+		helpers.ClearScreen()
+	}
+}
+
+func (client *Client) printBoard() {
+	if !client.DisablePrint {
+		client.board.PrintBoard()
 	}
 }
 
@@ -74,24 +119,38 @@ func (client *Client) printTurn() {
 }
 
 func (client *Client) printMessages() {
-	toPrint := client.Messages
-	length := len(client.Messages)
+	toPrint := client.messages
+	length := len(client.messages)
 	if length > 5 {
-		toPrint = client.Messages[len(client.Messages)-6:]
+		toPrint = client.messages[len(client.messages)-6:]
 	}
 
 	for _, message := range toPrint {
-		message.Print()
+		client.printString(message.Author + ": " + message.Content)
 	}
 }
 
-func (client *Client) refreshScreen() {
-	if !client.DisablePrint {
-		helpers.ClearScreen()
-		client.printTurn()
-		client.board.PrintBoard()
-		client.printMessages()
+func (client *Client) printHomeScreen(request types.Request) {
+	client.clearScreen()
+	client.printString("WELCOME TO GOMOKU!")
+	client.printString("Type 'mk' to make a new game")
+	client.printString("Type 'hm' to refresh")
+	client.printString("Type 'jn' followed by a game id to join a game")
+	client.printString("_________")
+	if len(request.Home) == 0 {
+		client.printString("(no open games)")
+	} else {
+		for _, game := range request.Home {
+			client.printString("Game ID: " + strconv.Itoa(game.ID) + " ----- User: " + game.UserID)
+		}
 	}
+}
+
+func (client *Client) printBoardAndMessages() {
+	client.clearScreen()
+	client.printTurn()
+	client.printBoard()
+	client.printMessages()
 }
 
 func (client *Client) sendToServer(request types.Request) {
@@ -111,8 +170,8 @@ func (client *Client) addMessage(content string, author string) {
 		Author:  author,
 	}
 
-	client.Messages = append(client.Messages, message)
-	client.refreshScreen()
+	client.messages = append(client.messages, message)
+	client.printBoardAndMessages()
 }
 
 func (client *Client) createGame() {
@@ -253,23 +312,10 @@ func (client *Client) handleHomeRequest(request types.Request) {
 	client.opponentID = ""
 	client.yourColor = ""
 	client.opponentColor = ""
-	client.Messages = []types.Message{}
+	client.messages = []types.Message{}
 	client.turn = 0
 	client.board = board.New()
-
-	helpers.ClearScreen()
-	client.printString("WELCOME TO GOMOKU!")
-	if len(request.Home) == 0 {
-		client.printString("No open games! Type 'mk' to make a new game!")
-	} else {
-		client.printString("Open Games")
-		client.printString("(type hm to refresh)")
-		client.printString("_________")
-
-		for _, game := range request.Home {
-			client.printString("Game ID: " + strconv.Itoa(game.ID) + " ----- User: " + game.UserID)
-		}
-	}
+	client.printHomeScreen(request)
 }
 
 func (client *Client) handleMoveRequest(request types.Request) {
@@ -325,7 +371,6 @@ func (client *Client) Handler(message []byte) {
 	case constants.MOVE:
 		client.handleMoveRequest(request)
 	}
-	client.refreshScreen()
 }
 
 func (client *Client) backToHome() {
