@@ -75,107 +75,142 @@ func TestBoardCheckForWinEmpty(t *testing.T) {
 	}
 }
 
-func TestBoardCheckForWinSuccessWhiteVertical(t *testing.T) {
-	gameBoard := board.New()
-	gameBoard.Spaces["white"]["3 3"] = true
-	gameBoard.Spaces["white"]["3 4"] = true
-	gameBoard.Spaces["white"]["3 5"] = true
-	gameBoard.Spaces["white"]["3 6"] = true
-	gameBoard.Spaces["white"]["3 7"] = true
-	expectedWinningCoordsWhite := []types.Coord{
-		types.Coord{X: 3, Y: 3},
-		types.Coord{X: 3, Y: 4},
-		types.Coord{X: 3, Y: 5},
-		types.Coord{X: 3, Y: 6},
-		types.Coord{X: 3, Y: 7},
+type BoardCheckForWinSuccessTestCase struct {
+	label                 string
+	coordStrings          []string
+	expectedWinningCoords []types.Coord
+}
+
+func TestBoardCheckForWinSuccessWhite(t *testing.T) {
+	testcases := []BoardCheckForWinSuccessTestCase{
+		BoardCheckForWinSuccessTestCase{
+			"horizontal",
+			[]string{"3 3", "4 3", "5 3", "6 3", "7 3"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 4, Y: 3},
+				types.Coord{X: 5, Y: 3},
+				types.Coord{X: 6, Y: 3},
+				types.Coord{X: 7, Y: 3},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"diagonal_right",
+			[]string{"3 3", "4 4", "5 5", "6 6", "7 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 4, Y: 4},
+				types.Coord{X: 5, Y: 5},
+				types.Coord{X: 6, Y: 6},
+				types.Coord{X: 7, Y: 7},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"vertical",
+			[]string{"3 3", "3 4", "3 5", "3 6", "3 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 3, Y: 4},
+				types.Coord{X: 3, Y: 5},
+				types.Coord{X: 3, Y: 6},
+				types.Coord{X: 3, Y: 7},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"diagonal_left",
+			[]string{"7 3", "6 4", "5 5", "4 6", "3 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 7},
+				types.Coord{X: 4, Y: 6},
+				types.Coord{X: 5, Y: 5},
+				types.Coord{X: 6, Y: 4},
+				types.Coord{X: 7, Y: 3},
+			},
+		},
 	}
+	for _, testcase := range testcases {
+		t.Run(testcase.label, func(t *testing.T) {
+			gameBoard := board.New()
+			for _, coordString := range testcase.coordStrings {
+				gameBoard.Spaces["white"][coordString] = true
+			}
 
-	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
+			winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
 
-	if len(*winningCoordsBlack) > 0 {
-		t.Errorf("Expected no winning spaces for black, found %d", len(*winningCoordsBlack))
-	}
+			if len(*winningCoordsBlack) > 0 {
+				t.Errorf("Expected no winning spaces for black, found %d: %s", len(*winningCoordsBlack), winningCoordsBlack)
+			}
 
-	if !coordSlicesAreEqual(winningCoordsWhite, &expectedWinningCoordsWhite) {
-		t.Errorf("Expected winning spaces for white to be %s, got %s", expectedWinningCoordsWhite, winningCoordsWhite)
+			if !coordSlicesAreEqual(winningCoordsWhite, &testcase.expectedWinningCoords) {
+				t.Errorf("Expected winning spaces for white to be %s, got %s", testcase.expectedWinningCoords, winningCoordsWhite)
+			}
+		})
 	}
 }
 
-func TestBoardCheckForWinSuccessWhiteHorizontal(t *testing.T) {
-	gameBoard := board.New()
-	gameBoard.Spaces["white"]["3 3"] = true
-	gameBoard.Spaces["white"]["4 3"] = true
-	gameBoard.Spaces["white"]["5 3"] = true
-	gameBoard.Spaces["white"]["6 3"] = true
-	gameBoard.Spaces["white"]["7 3"] = true
-
-	expectedWinningCoordsWhite := []types.Coord{
-		types.Coord{X: 3, Y: 3},
-		types.Coord{X: 4, Y: 3},
-		types.Coord{X: 5, Y: 3},
-		types.Coord{X: 6, Y: 3},
-		types.Coord{X: 7, Y: 3},
+func TestBoardCheckForWinSuccessBlack(t *testing.T) {
+	testcases := []BoardCheckForWinSuccessTestCase{
+		BoardCheckForWinSuccessTestCase{
+			"horizontal",
+			[]string{"3 3", "4 3", "5 3", "6 3", "7 3"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 4, Y: 3},
+				types.Coord{X: 5, Y: 3},
+				types.Coord{X: 6, Y: 3},
+				types.Coord{X: 7, Y: 3},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"diagonal_right",
+			[]string{"3 3", "4 4", "5 5", "6 6", "7 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 4, Y: 4},
+				types.Coord{X: 5, Y: 5},
+				types.Coord{X: 6, Y: 6},
+				types.Coord{X: 7, Y: 7},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"vertical",
+			[]string{"3 3", "3 4", "3 5", "3 6", "3 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 3},
+				types.Coord{X: 3, Y: 4},
+				types.Coord{X: 3, Y: 5},
+				types.Coord{X: 3, Y: 6},
+				types.Coord{X: 3, Y: 7},
+			},
+		},
+		BoardCheckForWinSuccessTestCase{
+			"diagonal_left",
+			[]string{"7 3", "6 4", "5 5", "4 6", "3 7"},
+			[]types.Coord{
+				types.Coord{X: 3, Y: 7},
+				types.Coord{X: 4, Y: 6},
+				types.Coord{X: 5, Y: 5},
+				types.Coord{X: 6, Y: 4},
+				types.Coord{X: 7, Y: 3},
+			},
+		},
 	}
+	for _, testcase := range testcases {
+		t.Run(testcase.label, func(t *testing.T) {
+			gameBoard := board.New()
+			for _, coordString := range testcase.coordStrings {
+				gameBoard.Spaces["black"][coordString] = true
+			}
 
-	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
+			winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
 
-	if len(*winningCoordsBlack) > 0 {
-		t.Errorf("Expected no winning spaces for black, found %d", len(*winningCoordsBlack))
-	}
+			if len(*winningCoordsWhite) > 0 {
+				t.Errorf("Expected no winning spaces for black, found %d: %s", len(*winningCoordsWhite), winningCoordsBlack)
+			}
 
-	if !coordSlicesAreEqual(winningCoordsWhite, &expectedWinningCoordsWhite) {
-		t.Errorf("Expected winning spaces for white to be %s, got %s", expectedWinningCoordsWhite, winningCoordsWhite)
-	}
-}
-
-func TestBoardCheckForWinSuccessWhiteDiagonalDownRight(t *testing.T) {
-	gameBoard := board.New()
-	gameBoard.Spaces["white"]["3 3"] = true
-	gameBoard.Spaces["white"]["4 4"] = true
-	gameBoard.Spaces["white"]["5 5"] = true
-	gameBoard.Spaces["white"]["6 6"] = true
-	gameBoard.Spaces["white"]["7 7"] = true
-
-	expectedWinningCoordsWhite := []types.Coord{
-		types.Coord{X: 3, Y: 3},
-		types.Coord{X: 4, Y: 4},
-		types.Coord{X: 5, Y: 5},
-		types.Coord{X: 6, Y: 6},
-		types.Coord{X: 7, Y: 7},
-	}
-	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
-
-	if len(*winningCoordsBlack) > 0 {
-		t.Errorf("Expected no winning spaces for black, found %d", len(*winningCoordsBlack))
-	}
-
-	if !coordSlicesAreEqual(winningCoordsWhite, &expectedWinningCoordsWhite) {
-		t.Errorf("Expected winning spaces for white to be %s, got %s", expectedWinningCoordsWhite, winningCoordsWhite)
-	}
-}
-
-func TestBoardCheckForWinSuccessWhiteDiagonalDownLeft(t *testing.T) {
-	gameBoard := board.New()
-	gameBoard.Spaces["white"]["7 3"] = true
-	gameBoard.Spaces["white"]["6 4"] = true
-	gameBoard.Spaces["white"]["5 5"] = true
-	gameBoard.Spaces["white"]["4 6"] = true
-	gameBoard.Spaces["white"]["3 7"] = true
-
-	expectedWinningCoordsWhite := []types.Coord{
-		types.Coord{X: 3, Y: 7},
-		types.Coord{X: 4, Y: 6},
-		types.Coord{X: 5, Y: 5},
-		types.Coord{X: 6, Y: 4},
-		types.Coord{X: 7, Y: 3},
-	}
-	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
-
-	if len(*winningCoordsBlack) > 0 {
-		t.Errorf("Expected no winning spaces for black, found %d", len(*winningCoordsBlack))
-	}
-
-	if !coordSlicesAreEqual(winningCoordsWhite, &expectedWinningCoordsWhite) {
-		t.Errorf("Expected winning spaces for white to be %s, got %s", expectedWinningCoordsWhite, winningCoordsWhite)
+			if !coordSlicesAreEqual(winningCoordsBlack, &testcase.expectedWinningCoords) {
+				t.Errorf("Expected winning spaces for white to be %s, got %s", testcase.expectedWinningCoords, winningCoordsBlack)
+			}
+		})
 	}
 }
