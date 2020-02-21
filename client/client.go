@@ -77,6 +77,7 @@ func (client *Client) printMessages() {
 	toPrint := client.Messages
 	length := len(client.Messages)
 	if length > 5 {
+		toPrint = client.Messages[len(client.Messages)-6:]
 	}
 
 	for _, message := range toPrint {
