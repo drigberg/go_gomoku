@@ -126,3 +126,32 @@ func TestClientHandleCreateSuccess(t *testing.T) {
 		t.Errorf("Expected message content to be %s, got: %s", expectedMessageContent, newClient.messages[0].Content)
 	}
 }
+
+func TestClientHandleCreateError(t *testing.T) {
+	serverName := "GoGomoku"
+	newClient := New(serverName)
+	newClient.DisablePrint = true
+	request := types.Request{
+		Success: false,
+		Action:  constants.CREATE,
+	}
+	requestBytes, err := helpers.GobToBytes(request)
+	if err != nil {
+		t.Errorf("Got error while encoding gob: %s", err)
+	}
+	newClient.Handler(requestBytes)
+
+	if len(newClient.messages) != 1 {
+		t.Errorf("Expected 1 message, found %d: %s", len(newClient.messages), newClient.messages)
+	}
+
+	if newClient.messages[0].Author != serverName {
+		t.Errorf("Expected message author to be %s, got: %s", serverName, newClient.messages[0].Author)
+	}
+
+	expectedMessageContent := "Error! Could not create game."
+
+	if newClient.messages[0].Content != expectedMessageContent {
+		t.Errorf("Expected message content to be %s, got: %s", expectedMessageContent, newClient.messages[0].Content)
+	}
+}
