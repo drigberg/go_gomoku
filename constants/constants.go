@@ -1,7 +1,7 @@
 package constants
 
 // constants
-var (
+const (
 	HOME        = "HOME"
 	FREE        = "FREE"
 	MOVE        = "MOVE"

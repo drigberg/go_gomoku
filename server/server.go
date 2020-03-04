@@ -60,41 +60,6 @@ type Server struct {
 	gameID int
 }
 
-// Listen starts the server
-func (server *Server) Listen(port string) {
-	log.Println("Starting server...")
-	listener, error := net.Listen("tcp", ":"+port)
-	if error != nil {
-		log.Println(error)
-	}
-
-	// create socket socketClient manager
-	socketClientManager := SocketClientManager{
-		clients:    make(map[*types.SocketClient]bool),
-		register:   make(chan *types.SocketClient),
-		unregister: make(chan *types.SocketClient),
-	}
-
-	go socketClientManager.start()
-
-	log.Println("Server listening on port " + port + "!")
-
-	for {
-		connection, _ := listener.Accept()
-		if error != nil {
-			log.Println(error)
-		}
-
-		socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
-
-		socketClientManager.register <- socketClient
-		go socketClientManager.receive(socketClient, server)
-		go socketClientManager.send(socketClient)
-
-		server.sendHome(socketClient)
-	}
-}
-
 // New creates a server instances
 func New() Server {
 	return Server{
@@ -426,6 +391,41 @@ func (server *Server) sendHome(socketClient *types.SocketClient) {
 	}
 
 	helpers.SendToClient(data, socketClient)
+}
+
+// Listen starts the server
+func (server *Server) Listen(port string) {
+	log.Println("Starting server...")
+	listener, error := net.Listen("tcp", ":"+port)
+	if error != nil {
+		log.Println(error)
+	}
+
+	// create socket socketClient manager
+	socketClientManager := SocketClientManager{
+		clients:    make(map[*types.SocketClient]bool),
+		register:   make(chan *types.SocketClient),
+		unregister: make(chan *types.SocketClient),
+	}
+
+	go socketClientManager.start()
+
+	log.Println("Server listening on port " + port + "!")
+
+	for {
+		connection, _ := listener.Accept()
+		if error != nil {
+			log.Println(error)
+		}
+
+		socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
+
+		socketClientManager.register <- socketClient
+		go socketClientManager.receive(socketClient, server)
+		go socketClientManager.send(socketClient)
+
+		server.sendHome(socketClient)
+	}
 }
 
 // SocketClientManager handles all clients
