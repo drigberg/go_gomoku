@@ -45,7 +45,12 @@ func GetOpponentID(game *GameRoom, userID string) string {
 func OtherClient(game *GameRoom, userID string) *types.SocketClient {
 	opponentID := GetOpponentID(game, userID)
 
-	return game.Players[opponentID].SocketClient
+	player := game.Players[opponentID]
+	
+	if player == nil {
+		return nil
+	}
+	return player.SocketClient
 }
 
 // IsTurn turns if it's a user's turn or not
@@ -75,8 +80,8 @@ func New() Server {
 func (server *Server) CreateGame(req types.Request, socketClient *types.SocketClient) int {
 	server.M.Lock()
 	defer server.M.Unlock()
+	defer func() { server.gameID++ }()
 
-	server.gameID++
 	player := types.Player{
 		UserID:       req.UserID,
 		SocketClient: socketClient,
@@ -200,6 +205,22 @@ func (server *Server) handleCreate(req types.Request, socketClient *types.Socket
 func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
 	otherClient := OtherClient(activeGame, req.UserID)
 
+	if otherClient == nil {
+		response := types.Request{
+			GameID:  req.GameID,
+			Action:  constants.JOIN,
+			Success: false,
+			Data:    "You are already in this room, and you can't go back! Sorry!",
+		}
+
+		return []SocketClientResponse{
+			SocketClientResponse{
+				socketClient,
+				response,
+			},
+		}
+	}
+
 	if len(activeGame.Players) == 2 {
 		response := types.Request{
 			GameID:  req.GameID,
@@ -245,21 +266,24 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		activeGame.FirstPlayerID = opponentID
 	}
 
+	// OpponentID is used to alert player to opponent's ID -- should be in Data
 	response1 := types.Request{
 		GameID:   req.GameID,
 		UserID:   opponentID,
 		Action:   constants.JOIN,
-		Success:  true,
 		YourTurn: activeGame.FirstPlayerID == req.UserID,
+		Success:  true,
 		Turn:     activeGame.Turn,
 	}
+
+	// Req.UserID is used to alert player to new player ID -- should be in Data
 	response2 := types.Request{
 		GameID:   req.GameID,
-		Action:   constants.OTHERJOINED,
-		Success:  true,
-		YourTurn: activeGame.FirstPlayerID != req.UserID,
-		Turn:     activeGame.Turn,
 		UserID:   req.UserID,
+		Action:   constants.OTHERJOINED,
+		YourTurn: activeGame.FirstPlayerID != req.UserID,
+		Success:  true,
+		Turn:     activeGame.Turn,
 	}
 
 	return []SocketClientResponse{

@@ -175,7 +175,7 @@ func (client *Client) addMessage(content string, author string) {
 }
 
 func (client *Client) createGame() {
-	if client.gameID != 0 {
+	if client.gameID != -1 {
 		client.printString("You're already in a game!")
 		return
 	}
@@ -189,7 +189,7 @@ func (client *Client) createGame() {
 }
 
 func (client *Client) joinGame(gameIDStr string) {
-	if client.gameID != 0 {
+	if client.gameID != -1 {
 		client.addMessage("You're already in a game!!", client.serverName)
 		return
 	}
@@ -211,7 +211,7 @@ func (client *Client) joinGame(gameIDStr string) {
 }
 
 func (client *Client) makeMove(text string) {
-	if client.gameID == 0 {
+	if client.gameID == -1 {
 		client.addMessage("You're not in a game yet!", client.serverName)
 	} else if client.turn == 0 {
 		client.addMessage("The game hasn't started yet!", client.serverName)
@@ -228,7 +228,7 @@ func (client *Client) makeMove(text string) {
 }
 
 func (client *Client) sendMessage(text string) {
-	if client.gameID == 0 {
+	if client.gameID == -1 {
 		client.addMessage("You're not in a game yet!", client.serverName)
 	} else if client.turn == 0 {
 		client.addMessage("The game hasn't started yet!", client.serverName)
@@ -308,7 +308,7 @@ func (client *Client) handleMessageRequest(request types.Request) {
 
 func (client *Client) handleHomeRequest(request types.Request) {
 	client.gameOver = false
-	client.gameID = 0
+	client.gameID = -1
 	client.opponentID = ""
 	client.yourColor = ""
 	client.opponentColor = ""
@@ -424,7 +424,7 @@ func (client *Client) listenForInput() {
 			}
 			client.makeMove(text[3:])
 		case "hm":
-			if client.gameOver || client.gameID == 0 {
+			if client.gameOver || client.gameID == -1 {
 				client.backToHome()
 				continue
 			}

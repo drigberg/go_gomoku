@@ -147,9 +147,9 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
-		expected_message := "That spot is already taken!"
-		if errorResponse.Data != expected_message {
-			t.Errorf("Expected message to be %s, got %s", expected_message, errorResponse.Data)
+		expectedMessage := "That spot is already taken!"
+		if errorResponse.Data != expectedMessage {
+			t.Errorf("Expected message to be %s, got %s", expectedMessage, errorResponse.Data)
 		}
 	}
 }
@@ -187,9 +187,9 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
-		expected_message := "Both x and y must be integers from 1 to 15"
-		if errorResponse.Data != expected_message {
-			t.Errorf("Expected message to be %s, got %s", expected_message, errorResponse.Data)
+		expectedMessage := "Both x and y must be integers from 1 to 15"
+		if errorResponse.Data != expectedMessage {
+			t.Errorf("Expected message to be %s, got %s", expectedMessage, errorResponse.Data)
 		}
 	}
 }
@@ -227,17 +227,18 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
-		expected_message := "The syntax for a move is mv <x> <y>"
-		if errorResponse.Data != expected_message {
-			t.Errorf("Expected message to be %s, got %s", expected_message, errorResponse.Data)
+		expectedMessage := "The syntax for a move is mv <x> <y>"
+		if errorResponse.Data != expectedMessage {
+			t.Errorf("Expected message to be %s, got %s", expectedMessage, errorResponse.Data)
 		}
 	}
 }
 
 func TestServerHandleCreate(t *testing.T) {
+	playerID := "mock_player_1"
 	newServer := New()
 	req := types.Request{
-		UserID: "mock_player_1",
+		UserID: playerID,
 	}
 	socketClient := types.SocketClient{}
 	socketClientResponses := newServer.handleCreate(req, &socketClient)
@@ -248,5 +249,109 @@ func TestServerHandleCreate(t *testing.T) {
 
 	if response.Action != constants.CREATE {
 		t.Errorf("Expected response to be type CREATE, got %s", response.Action)
+	}
+
+	gameID := response.GameID
+	game := newServer.games[gameID]
+	if game == nil {
+		t.Errorf("Expected to find game by id from response")
+	}
+
+	if game.ID != gameID {
+		t.Errorf("Expected game to have id %d, got %d", gameID, game.ID)
+	}
+
+	if len(game.Players) != 1 {
+		t.Errorf("Expected game to have 1 player, got %d", len(game.Players))
+	}
+
+	player := game.Players[playerID]
+
+	if player == nil {
+		t.Errorf("Expected to find player by ID %s", playerID)
+	}
+
+	if game.Turn != 0 {
+		t.Errorf("Expected game to have turn 0, got %d", game.Turn)
+	}
+}
+
+func TestServerHandleJoinSuccess(t *testing.T) {
+	newServer := New()
+	createRequest := types.Request{
+		UserID: "mock_player_1",
+	}
+
+	socketClient := types.SocketClient{}
+	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
+	gameID := socketClientResponsesCreate[0].response.GameID
+	game := newServer.games[gameID]
+
+	joinRequest := types.Request{
+		UserID: "mock_player_2",
+	}
+
+	otherSocketClient := types.SocketClient{}
+	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
+	if len(socketClientResponsesJoin) != 2 {
+		t.Errorf("Expected 2 responses, got %d", len(socketClientResponsesJoin))
+	}
+
+	responses := []types.Request{socketClientResponsesJoin[0].response, socketClientResponsesJoin[1].response}
+
+	for i, response := range responses {
+		if response.GameID != gameID {
+			t.Errorf("Expected response %d to have gameID %d, got %d", i, gameID, response.GameID)
+		}
+
+		expectedYourTurn := game.FirstPlayerID != response.UserID
+		if response.YourTurn != expectedYourTurn {
+			t.Errorf("Expected response %d for player %s to have YourTurn %t, got %t", i, response.UserID, expectedYourTurn, response.YourTurn)
+		}
+		if response.UserID == joinRequest.UserID && response.Action != constants.OTHERJOINED {
+			t.Errorf("Expected response %d to have action OTHERJOINED, got %s", i, constants.OTHERJOINED)
+		}
+		if response.UserID == createRequest.UserID && response.Action != constants.JOIN {
+			t.Errorf("Expected response %d to have action JOIN, got %s", i, constants.JOIN)
+		}
+		if response.Success != true {
+			t.Errorf("Expected response %d to have success=true", i)
+		}
+		if response.Turn != 1 {
+			t.Errorf("Expected response %d to have turn 1, got %d", i, response.Turn)
+		}
+	}
+}
+
+func TestServerHandleJoinAlreadyInRoom(t *testing.T) {
+	newServer := New()
+	createRequest := types.Request{
+		UserID: "mock_player_1",
+	}
+
+	socketClient := types.SocketClient{}
+	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
+	gameID := socketClientResponsesCreate[0].response.GameID
+	game := newServer.games[gameID]
+
+	joinRequest := types.Request{
+		UserID: "mock_player_1",
+	}
+
+	otherSocketClient := types.SocketClient{}
+	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
+	if len(socketClientResponsesJoin) != 1 {
+		t.Errorf("Expected 1 response, got %d", len(socketClientResponsesJoin))
+	}
+
+	response := socketClientResponsesJoin[0].response
+
+	if response.Action != constants.JOIN {
+		t.Errorf("Expected response to be type JOIN, got %s", response.Action)
+	}
+
+	expectedMessage := "You are already in this room, and you can't go back! Sorry!"
+	if response.Data != expectedMessage {
+		t.Errorf("Expected message to be %s, got %s", expectedMessage, response.Data)
 	}
 }
