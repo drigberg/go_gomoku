@@ -10,11 +10,13 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // GameRoom contains all info related to a room
 type GameRoom struct {
+	M 		      sync.Mutex
 	ID            int
 	Players       map[string]*types.Player
 	Turn          int
@@ -24,9 +26,8 @@ type GameRoom struct {
 }
 
 // PlayMove places a piece
-func (game GameRoom) PlayMove(move types.Coord, color string) {
+func (game *GameRoom) PlayMove(move types.Coord, color string) {
 	moveStr := move.String()
-
 	game.Board.Spaces[color][moveStr] = true
 }
 
@@ -57,6 +58,7 @@ func IsTurn(game *GameRoom, userID string) bool {
 
 // Server handles all requests and game states
 type Server struct {
+	M      sync.Mutex
 	games  map[int]*GameRoom
 	gameID int
 }
@@ -71,6 +73,9 @@ func New() Server {
 
 // CreateGame creates a game and returns the id
 func (server *Server) CreateGame(req types.Request, socketClient *types.SocketClient) int {
+	server.M.Lock()
+	defer server.M.Unlock()
+
 	server.gameID++
 	player := types.Player{
 		UserID:       req.UserID,
@@ -455,6 +460,12 @@ func (server *Server) HandleRequest(req types.Request, socketClient *types.Socke
 	log.Print("Received!", socketClient, req)
 	activeGame := server.games[req.GameID]
 
+	if activeGame != nil {
+		activeGame.M.Lock()
+		defer activeGame.M.Unlock()
+	}
+
+
 	socketClientResponses := []SocketClientResponse{}
 	switch action := req.Action; action {
 	case constants.CREATE:
@@ -541,7 +552,7 @@ func (server *Server) Listen(port string) {
 
 		socketClientResponses := server.handleSendToHome(socketClient)
 		for _, socketClientResponse := range socketClientResponses {
-			socketClientResponse.send()
+			go socketClientResponse.send()
 		}
 	}
 }
