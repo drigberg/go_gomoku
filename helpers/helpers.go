@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"time"
 )
 
 func clearWindows() {
@@ -62,38 +61,4 @@ func GobToBytes(key interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// SendBackoff tries to send and keeps trying
-func SendBackoff(data []byte, socketClient *types.SocketClient, i int) {
-	if i > 1 {
-		fmt.Println("Retrying message send! Attempt:", i)
-	}
-	if socketClient.Closed {
-		return
-	}
-
-	select {
-	case socketClient.Data <- data:
-		return
-	default:
-		time.Sleep(500 * time.Millisecond)
-
-		if i > 5 {
-			return
-		}
-		SendBackoff(data, socketClient, i+1)
-	}
-}
-
-// SendToClient tries to send a request to socketClient, with backoff
-func SendToClient(request types.Request, socketClient *types.SocketClient) {
-	data, err := GobToBytes(request)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	SendBackoff(data, socketClient, 1)
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // GameRoom contains all info related to a room
@@ -137,17 +138,61 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 	return true, move, types.Request{}
 }
 
-func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) {
+type SocketClientResponse struct {
+	socketClient *types.SocketClient
+	response types.Request
+}
+
+// SendBackoff tries to send and keeps trying
+func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int) {
+	if i > 1 {
+		log.Println("Retrying message send! Attempt:", i)
+	}
+	if socketClientResponse.socketClient.Closed {
+		return
+	}
+
+	select {
+	case socketClientResponse.socketClient.Data <- data:
+		return
+	default:
+		time.Sleep(500 * time.Millisecond)
+
+		if i > 5 {
+			return
+		}
+		socketClientResponse.sendBackoff(data, i+1)
+	}
+}
+
+// SendToClient tries to send a request to socketClient, with backoff
+func (socketClientResponse *SocketClientResponse) send() {
+	data, err := helpers.GobToBytes(socketClientResponse.response)
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	socketClientResponse.sendBackoff(data, 1)
+}
+
+func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) []SocketClientResponse {
 	gameID := server.CreateGame(req, socketClient)
 	response := types.Request{
 		GameID:  gameID,
 		Action:  constants.CREATE,
 		Success: true,
 	}
-	helpers.SendToClient(response, socketClient)
+	return []SocketClientResponse{
+		SocketClientResponse{
+			socketClient,
+			response,
+		},
+	}
 }
 
-func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
+func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
 	otherClient := OtherClient(activeGame, req.UserID)
 
 	if len(activeGame.Players) == 2 {
@@ -158,8 +203,12 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 			Data:    "Game is full already",
 		}
 
-		helpers.SendToClient(response, socketClient)
-		return
+		return []SocketClientResponse{
+			SocketClientResponse{
+				socketClient,
+				response,
+			},
+		}
 	}
 
 	if otherClient.Closed {
@@ -170,8 +219,12 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 			Data:    "Other player already left that game",
 		}
 
-		helpers.SendToClient(response, socketClient)
-		return
+		return []SocketClientResponse{
+			SocketClientResponse{
+				socketClient,
+				response,
+			},
+		}
 	}
 
 	player := types.Player{
@@ -187,7 +240,7 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		activeGame.FirstPlayerID = opponentID
 	}
 
-	response := types.Request{
+	response1 := types.Request{
 		GameID:   req.GameID,
 		UserID:   opponentID,
 		Action:   constants.JOIN,
@@ -195,7 +248,7 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		YourTurn: activeGame.FirstPlayerID == req.UserID,
 		Turn:     activeGame.Turn,
 	}
-	notification := types.Request{
+	response2 := types.Request{
 		GameID:   req.GameID,
 		Action:   constants.OTHERJOINED,
 		Success:  true,
@@ -204,11 +257,19 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		UserID:   req.UserID,
 	}
 
-	helpers.SendToClient(response, socketClient)
-	helpers.SendToClient(notification, otherClient)
+	return []SocketClientResponse{
+		SocketClientResponse{
+			socketClient,
+			response1,
+		},
+		SocketClientResponse{
+			otherClient,
+			response2,
+		},
+	}
 }
 
-func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
+func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
 	response := types.Request{
 		GameID:  req.GameID,
 		UserID:  req.UserID,
@@ -216,13 +277,17 @@ func (server *Server) handleMessage(req types.Request, socketClient *types.Socke
 		Data:    req.Data,
 		Success: true,
 	}
-
 	otherClient := OtherClient(activeGame, req.UserID)
 
-	helpers.SendToClient(response, otherClient)
+	return []SocketClientResponse{
+		SocketClientResponse{
+			otherClient,
+			response,
+		},
+	}
 }
 
-func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) {
+func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
 	response := types.Request{
 		GameID: req.GameID,
 		UserID: req.UserID,
@@ -242,8 +307,12 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 			Success: false,
 		}
 
-		helpers.SendToClient(errorResponse, socketClient)
-		return
+		return []SocketClientResponse{
+			SocketClientResponse{
+				socketClient,
+				errorResponse,
+			},
+		}
 	}
 
 	switch turn := activeGame.Turn; turn {
@@ -259,8 +328,12 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 					Success: false,
 				}
 
-				helpers.SendToClient(errorResponse, socketClient)
-				return
+				return []SocketClientResponse{
+					SocketClientResponse{
+						socketClient,
+						errorResponse,
+					},
+				}
 			}
 
 			moves := [3]types.Coord{}
@@ -268,8 +341,12 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 				ok, move, errorResponse := server.ParseMove(req, moveStr)
 
 				if !ok {
-					helpers.SendToClient(errorResponse, socketClient)
-					return
+					return []SocketClientResponse{
+						SocketClientResponse{
+							socketClient,
+							errorResponse,
+						},
+					}
 				}
 
 				moves[i] = move
@@ -295,8 +372,12 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 			ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 			if !ok {
-				helpers.SendToClient(errorResponse, socketClient)
-				return
+				return []SocketClientResponse{
+					SocketClientResponse{
+						socketClient,
+						errorResponse,
+					},
+				}
 			}
 
 			activeGame.Players[req.UserID].Color = "white"
@@ -311,8 +392,12 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 		ok, move, errorResponse := server.ParseMove(req, req.Data)
 
 		if !ok {
-			helpers.SendToClient(errorResponse, socketClient)
-			return
+			return []SocketClientResponse{
+				SocketClientResponse{
+					socketClient,
+					errorResponse,
+				},
+			}
 		}
 
 		activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
@@ -333,40 +418,65 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 
 	if !gameOver {
 		activeGame.Turn++
-
 		response.YourTurn = false
 		response.Turn = activeGame.Turn
 	}
 
-	helpers.SendToClient(response, socketClient)
-
 	otherClient := OtherClient(activeGame, req.UserID)
-	response.YourTurn = true
-	helpers.SendToClient(response, otherClient)
+	otherClientResponse := types.Request{
+		YourTurn: true,
+		GameID: response.GameID,
+		UserID: response.UserID,
+		Action: response.Action,
+		Success: response.Success,
+		GameOver: response.GameOver,
+		Data: response.Data,
+		Turn: response.Turn,
+		Colors: response.Colors,
+		Board: response.Board,
+		Home: response.Home,
+	}
+
+	return []SocketClientResponse{
+		SocketClientResponse{
+			socketClient,
+			response,
+		},
+		SocketClientResponse{
+			otherClient,
+			otherClientResponse,
+		},
+	}
 }
 
 // HandleRequest handles a request
 func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
+	// TODO: only respond at end of this method, get responses from handlers
 	log.Print("Received!", socketClient, req)
 	activeGame := server.games[req.GameID]
 
+	socketClientResponses := []SocketClientResponse{}
 	switch action := req.Action; action {
 	case constants.CREATE:
-		server.handleCreate(req, socketClient)
+		socketClientResponses = server.handleCreate(req, socketClient)
 	case constants.JOIN:
-		server.handleJoin(req, socketClient, activeGame)
+		socketClientResponses = server.handleJoin(req, socketClient, activeGame)
 	case constants.MESSAGE:
-		server.handleMessage(req, socketClient, activeGame)
+		socketClientResponses = server.handleMessage(req, socketClient, activeGame)
 	case constants.MOVE:
-		server.handleMove(req, socketClient, activeGame)
+		socketClientResponses = server.handleMove(req, socketClient, activeGame)
 	case constants.HOME:
-		server.sendHome(socketClient)
+		socketClientResponses = server.handleSendToHome(socketClient)
 	default:
 		log.Println("Unrecognized action:", req.Action)
 	}
+
+	for _, socketClientResponse := range socketClientResponses {
+		socketClientResponse.send()
+	}
 }
 
-func (server *Server) sendHome(socketClient *types.SocketClient) {
+func (server *Server) handleSendToHome(socketClient *types.SocketClient) []SocketClientResponse {
 	home := []types.OpenRoom{}
 
 	for _, game := range server.games {
@@ -385,12 +495,17 @@ func (server *Server) sendHome(socketClient *types.SocketClient) {
 		}
 	}
 
-	data := types.Request{
+	response := types.Request{
 		Action: constants.HOME,
 		Home:   home,
 	}
 
-	helpers.SendToClient(data, socketClient)
+	return []SocketClientResponse{
+		SocketClientResponse{
+			socketClient,
+			response,
+		},
+	}
 }
 
 // Listen starts the server
@@ -424,7 +539,10 @@ func (server *Server) Listen(port string) {
 		go socketClientManager.receive(socketClient, server)
 		go socketClientManager.send(socketClient)
 
-		server.sendHome(socketClient)
+		socketClientResponses := server.handleSendToHome(socketClient)
+		for _, socketClientResponse := range socketClientResponses {
+			socketClientResponse.send()
+		}
 	}
 }
 
