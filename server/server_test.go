@@ -3,6 +3,7 @@ package server
 import (
 	"testing"
 	"go_gomoku/board"
+	"go_gomoku/constants"
 	"go_gomoku/types"
 )
 
@@ -230,5 +231,22 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 		if errorResponse.Data != expected_message {
 			t.Errorf("Expected message to be %s, got %s", expected_message, errorResponse.Data)
 		}
+	}
+}
+
+func TestServerHandleCreate(t *testing.T) {
+	newServer := New()
+	req := types.Request{
+		UserID: "mock_player_1",
+	}
+	socketClient := types.SocketClient{}
+	socketClientResponses := newServer.handleCreate(req, &socketClient)
+	if len(socketClientResponses) != 1 {
+		t.Errorf("Expected 1 response, got %d", len(socketClientResponses))
+	}
+	response := socketClientResponses[0].response
+
+	if response.Action != constants.CREATE {
+		t.Errorf("Expected response to be type CREATE, got %s", response.Action)
 	}
 }
