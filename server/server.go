@@ -456,15 +456,13 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 
 // HandleRequest handles a request
 func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
-	// TODO: only respond at end of this method, get responses from handlers
-	log.Print("Received!", socketClient, req)
-	activeGame := server.games[req.GameID]
+	log.Println("Request:", socketClient, req)
 
+	activeGame := server.games[req.GameID]
 	if activeGame != nil {
 		activeGame.M.Lock()
 		defer activeGame.M.Unlock()
 	}
-
 
 	socketClientResponses := []SocketClientResponse{}
 	switch action := req.Action; action {
