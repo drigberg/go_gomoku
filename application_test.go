@@ -62,7 +62,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 	go socketClient.Receive(newClient.Handler, &connected)
 	select {
 	case <-connected:
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Error("Could not connect")
 	}
 
@@ -89,7 +89,7 @@ func TestGoGomokuCreateGameSuccess(t *testing.T) {
 	go socketClient.Receive(newClient.Handler, &connected)
 	select {
 	case <-connected:
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Error("Could not connect")
 	}
 	waitForHandledRequest(&newClient, constants.HOME)
@@ -119,7 +119,7 @@ func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 	go socketClient.Receive(newClient.Handler, &connected)
 	select {
 	case <-connected:
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Error("Could not connect")
 	}
 
