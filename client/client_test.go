@@ -104,8 +104,8 @@ func TestClientHandleCreateSuccess(t *testing.T) {
 		t.Error("Expected gameOver to be false")
 	}
 
-	if newClient.gameID != gameID {
-		t.Errorf("Expected gameID to be %d, got %d", gameID, newClient.gameID)
+	if newClient.GameID != gameID {
+		t.Errorf("Expected gameID to be %d, got %d", gameID, newClient.GameID)
 	}
 
 	if !newClient.yourTurn {

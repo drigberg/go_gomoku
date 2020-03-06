@@ -63,9 +63,12 @@ func IsTurn(game *GameRoom, userID string) bool {
 
 // Server handles all requests and game states
 type Server struct {
-	M      sync.Mutex
-	games  map[int]*GameRoom
-	gameID int
+	M      		sync.Mutex
+	games  		map[int]*GameRoom
+	gameID 		int
+	quit 		chan interface{}
+	listener 	net.Listener
+	wg 			sync.WaitGroup
 }
 
 // New creates a server instances
@@ -73,6 +76,7 @@ func New() Server {
 	return Server{
 		games:  make(map[int]*GameRoom),
 		gameID: 0,
+		quit: make(chan interface {}),
 	}
 }
 
@@ -541,14 +545,23 @@ func (server *Server) handleSendToHome(socketClient *types.SocketClient) []Socke
 	}
 }
 
+func (server *Server) Stop() {
+	close(server.quit)
+	server.listener.Close()
+	server.wg.Wait()
+}
+
 // Listen starts the server
 func (server *Server) Listen(port string) {
 	log.Println("Starting server...")
-	listener, error := net.Listen("tcp", ":"+port)
-	if error != nil {
-		log.Println(error)
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatal(err)
 	}
-
+	server.listener = listener
+	server.wg.Add(1)
+	defer server.wg.Done()
+	
 	// create socket socketClient manager
 	socketClientManager := SocketClientManager{
 		clients:    make(map[*types.SocketClient]bool),
@@ -561,20 +574,28 @@ func (server *Server) Listen(port string) {
 	log.Println("Server listening on port " + port + "!")
 
 	for {
-		connection, _ := listener.Accept()
-		if error != nil {
-			log.Println(error)
-		}
-
-		socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
-
-		socketClientManager.register <- socketClient
-		go socketClientManager.receive(socketClient, server)
-		go socketClientManager.send(socketClient)
-
-		socketClientResponses := server.handleSendToHome(socketClient)
-		for _, socketClientResponse := range socketClientResponses {
-			go socketClientResponse.send()
+		connection, err := listener.Accept()
+		if err != nil {
+			select {
+			case <-server.quit:
+			  return
+			default:
+			  log.Println("Accept error:", err)
+			}
+		} else {
+			server.wg.Add(1)
+			socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
+			socketClientManager.register <- socketClient
+			go func() {
+				socketClientManager.receive(socketClient, server)
+				server.wg.Done()
+			}()
+			go socketClientManager.send(socketClient)
+	
+			socketClientResponses := server.handleSendToHome(socketClient)
+			for _, socketClientResponse := range socketClientResponses {
+				go socketClientResponse.send()
+			}
 		}
 	}
 }
