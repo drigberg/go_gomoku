@@ -73,6 +73,7 @@ func getParseCoordsTestCasesInvalidSyntax() []string {
 
 func TestServerParseCoordsValid(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	gameID := 3
 	player1 := types.Player{
 		UserID:       "mock_user1",
@@ -115,6 +116,7 @@ func TestServerParseCoordsValid(t *testing.T) {
 
 func TestServerParseCoordsInvalidTaken(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	gameID := 3
 	player1 := types.Player{
 		UserID:       "mock_user1",
@@ -156,6 +158,7 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 
 func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	gameID := 3
 	player1 := types.Player{
 		UserID:       "mock_user1",
@@ -196,6 +199,7 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 
 func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	gameID := 3
 	player1 := types.Player{
 		UserID:       "mock_user1",
@@ -237,6 +241,7 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 func TestServerHandleCreate(t *testing.T) {
 	playerID := "mock_player_1"
 	newServer := New()
+	newServer.DisablePrint = true
 	req := types.Request{
 		UserID: playerID,
 	}
@@ -278,6 +283,7 @@ func TestServerHandleCreate(t *testing.T) {
 
 func TestServerHandleJoinSuccess(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	createRequest := types.Request{
 		UserID: "mock_player_1",
 	}
@@ -325,6 +331,7 @@ func TestServerHandleJoinSuccess(t *testing.T) {
 
 func TestServerHandleJoinAlreadyInRoom(t *testing.T) {
 	newServer := New()
+	newServer.DisablePrint = true
 	createRequest := types.Request{
 		UserID: "mock_player_1",
 	}

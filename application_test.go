@@ -50,6 +50,7 @@ func waitForHandledRequest(newClient *client.Client, action string) (types.Reque
 
 func TestGoGomokuConnectSuccess(t *testing.T) {
 	newServer := server.New()
+	newServer.DisablePrint = true
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -77,6 +78,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 
 func TestGoGomokuCreateGameSuccess(t *testing.T) {
 	newServer := server.New()
+	newServer.DisablePrint = true
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -107,6 +109,7 @@ func TestGoGomokuCreateGameSuccess(t *testing.T) {
 
 func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 	newServer := server.New()
+	newServer.DisablePrint = true
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
