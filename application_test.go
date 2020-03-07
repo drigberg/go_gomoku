@@ -20,14 +20,14 @@ func (reader incrementalReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func waitForHandledRequest(newClient *Client, action string) (Request, error) {
+func waitForHandledRequest(client *Client, action string) (Request, error) {
 	var err error
 	var request Request
 	done := make(chan Request)
 
 	go func() {
 		for {
-			request := <- newClient.handledRequests
+			request := <- client.handledRequests
 			if request.Action == action {
 				done <- request
 				return
@@ -45,17 +45,17 @@ func waitForHandledRequest(newClient *Client, action string) (Request, error) {
 }
 
 func TestGoGomokuConnectSuccess(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
-	newClient := NewClient("Test")
-	newClient.disablePrint = true
-	socketClient := newClient.Connect("localhost", "3003")
+	client := NewClient("Test")
+	client.disablePrint = true
+	socketClient := client.Connect("localhost", "3003")
 	defer socketClient.Socket.Close()
 
 	connected := make(chan bool)
-	go socketClient.Receive(newClient.handler, &connected)
+	go socketClient.Receive(client.handler, &connected)
 	select {
 	case <-connected:
 	case <-time.After(1 * time.Second):
@@ -63,7 +63,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 	}
 
 	// verify sent home
-	request, err := waitForHandledRequest(&newClient, HOME)
+	request, err := waitForHandledRequest(&client, HOME)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,13 +81,13 @@ type PlayerBundle struct {
 
 func setupClient(t *testing.T) (PlayerBundle, error) {
 	var err error
-	newClient := NewClient("Test")
-	newClient.disablePrint = true
-	newSocketClient := newClient.Connect("localhost", "3003")
+	client := NewClient("Test")
+	client.disablePrint = true
+	newSocketClient := client.Connect("localhost", "3003")
 	connected := make(chan bool)
 	reader := incrementalReader{make(chan string)}
 
-	go newSocketClient.Receive(newClient.handler, &connected)
+	go newSocketClient.Receive(client.handler, &connected)
 	select {
 	case <-connected:
 	case <-time.After(1 * time.Second):
@@ -95,18 +95,18 @@ func setupClient(t *testing.T) (PlayerBundle, error) {
 	}
 
 	go func() {
-		newClient.listenForInput(reader)
+		client.listenForInput(reader)
 	}()
 
 	player := PlayerBundle{
-		&newClient,
+		&client,
 		newSocketClient,
 		&reader,
 	}
 
 	if err == nil {
 		// verify sent home
-		_, homeError := waitForHandledRequest(&newClient, HOME)
+		_, homeError := waitForHandledRequest(&client, HOME)
 		if homeError != nil {
 			err = homeError
 		}
@@ -116,9 +116,9 @@ func setupClient(t *testing.T) (PlayerBundle, error) {
 }
 
 func TestGoGomokuCreateGameSuccess(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1Bundle, err := setupClient(t)
 	defer player1Bundle.socketClient.Socket.Close()
@@ -139,9 +139,9 @@ func TestGoGomokuCreateGameSuccess(t *testing.T) {
 }
 
 func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1Bundle, err := setupClient(t)
 	defer player1Bundle.socketClient.Socket.Close()
@@ -169,9 +169,9 @@ func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 
 
 func TestGoGomokuHomeFromGameUnconfirmed(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1Bundle, err := setupClient(t)
 	defer player1Bundle.socketClient.Socket.Close()
@@ -195,9 +195,9 @@ func TestGoGomokuHomeFromGameUnconfirmed(t *testing.T) {
 }
 
 func TestGoGomokuHomeFromGameRefused(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1Bundle, err := setupClient(t)
 	defer player1Bundle.socketClient.Socket.Close()
@@ -222,9 +222,9 @@ func TestGoGomokuHomeFromGameRefused(t *testing.T) {
 }
 
 func TestGoGomokuHomeRefresh(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1Bundle, err := setupClient(t)
 	defer player1Bundle.socketClient.Socket.Close()
@@ -318,18 +318,183 @@ func setupGame(t *testing.T) (PlayerBundle, PlayerBundle, error) {
 		return player1, player2, errors.New("PlayerBundles are not in same game")
 	}
 
-	return player1, player2, nil
+	if player1.client.yourTurn {
+		return player1, player2, nil
+	}
+	return player2, player1, nil
 }
 
 func TestGoGomokuJoinGameSuccess(t *testing.T) {
-	newServer := NewServer()
-	go newServer.Listen("3003")
-	defer newServer.Stop()
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
 
 	player1, player2, err := setupGame(t)
 	defer player1.socketClient.Socket.Close()
 	defer player2.socketClient.Socket.Close()
 
+	if err != nil {
+		t.Error(err)
+	}
+
+	if player1.client.yourColor != "" {
+		t.Errorf("Expected player1 color to be empty, got %s", player1.client.yourColor)
+	}
+
+	if player1.client.opponentColor != "" {
+		t.Errorf("Expected player1 opponent color to be empty, got %s", player1.client.yourColor)
+	}
+
+	if player2.client.opponentColor != "" {
+		t.Errorf("Expected player2 opponent color to be empty, got %s", player2.client.yourColor)
+	}
+}
+
+func playMove(move string, movingPlayer PlayerBundle, waitingPlayer PlayerBundle) error {
+	movingPlayer.reader.input <- move
+	_, err := waitForHandledRequest(movingPlayer.client, MOVE)
+	if err != nil {
+		return err
+	}
+	_, err = waitForHandledRequest(waitingPlayer.client, MOVE)
+	if err != nil {
+		return err
+	}
+
+	if movingPlayer.client.yourTurn {
+		return errors.New("Should not be moving player's turn anymore")
+	}
+
+	if !waitingPlayer.client.yourTurn {
+		return errors.New("Should be waiting player's turn now")
+	}
+	return nil
+}
+
+func TestGoGomokuFirstMoveSuccess(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGoGomokuSecondMovePass(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv pass\n", player2, player1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if player1.client.yourColor != "white" {
+		t.Errorf("Expected player 1's color to be white, got %s", player1.client.yourColor)
+	}
+	if player1.client.opponentColor != "black" {
+		t.Errorf("Expected player 1's opponentColor to be black, got %s", player1.client.opponentColor)
+	}
+
+	if player2.client.yourColor != "black" {
+		t.Errorf("Expected player 2's color to be black, got %s", player2.client.yourColor)
+	}
+	if player2.client.opponentColor != "white" {
+		t.Errorf("Expected player 2's opponentColor to be white, got %s", player2.client.opponentColor)
+	}
+}
+
+func TestGoGomokuSecondMoveSuccess(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 4\n", player2, player1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if player1.client.yourColor != "black" {
+		t.Errorf("Expected player 1's color to be black, got %s", player1.client.yourColor)
+	}
+	if player1.client.opponentColor != "white" {
+		t.Errorf("Expected player 1's opponentColor to be white, got %s", player1.client.opponentColor)
+	}
+
+	if player2.client.yourColor != "white" {
+		t.Errorf("Expected player 2's color to be white, got %s", player2.client.yourColor)
+	}
+	if player2.client.opponentColor != "black" {
+		t.Errorf("Expected player 2's opponentColor to be black, got %s", player2.client.opponentColor)
+	}
+}
+
+func TestGoGomokuFurtherMoveSuccessAfterPass(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv pass\n", player2, player1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 4\n", player1, player2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMove("mv 1 5\n", player2, player1)
 	if err != nil {
 		t.Error(err)
 	}

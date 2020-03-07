@@ -69,7 +69,7 @@ func getParseCoordsTestCasesInvalidSyntax() []string {
 }
 
 func TestServerParseCoordsValid(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	gameID := 3
 	player1 := Player{
 		UserID:       "mock_user1",
@@ -84,7 +84,7 @@ func TestServerParseCoordsValid(t *testing.T) {
 	players[player1.UserID] = &player1
 	players[player2.UserID] = &player2
 
-	newServer.games[gameID] = &GameRoom{
+	server.games[gameID] = &GameRoom{
 		ID:      gameID,
 		Players: players,
 		Turn:    0,
@@ -97,7 +97,7 @@ func TestServerParseCoordsValid(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, move, errorResponse := newServer.parseMove(req, testcase.input)
+		is_valid, move, errorResponse := server.parseMove(req, testcase.input)
 		if !is_valid {
 			t.Errorf("Expected move to be valid")
 		}
@@ -111,7 +111,7 @@ func TestServerParseCoordsValid(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidTaken(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	gameID := 3
 	player1 := Player{
 		UserID:       "mock_user1",
@@ -131,7 +131,7 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 		Turn:    0,
 		Board:   NewBoard(),
 	}
-	newServer.games[gameID] = &game
+	server.games[gameID] = &game
 
 	testcases := getValidParseCoordsTestCases()
 	for _, testcase := range testcases {
@@ -140,7 +140,7 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.parseMove(req, testcase.input)
+		is_valid, _, errorResponse := server.parseMove(req, testcase.input)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
@@ -152,7 +152,7 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	gameID := 3
 	player1 := Player{
 		UserID:       "mock_user1",
@@ -172,7 +172,7 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 		Turn:    0,
 		Board:   NewBoard(),
 	}
-	newServer.games[gameID] = &game
+	server.games[gameID] = &game
 
 	testcases := getInvalidParseCoordsTestCasesOffBoardOrNonNumber()
 	for _, testcase := range testcases {
@@ -180,7 +180,7 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.parseMove(req, testcase)
+		is_valid, _, errorResponse := server.parseMove(req, testcase)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
@@ -192,7 +192,7 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidSyntax(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	gameID := 3
 	player1 := Player{
 		UserID:       "mock_user1",
@@ -212,7 +212,7 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 		Turn:    0,
 		Board:   NewBoard(),
 	}
-	newServer.games[gameID] = &game
+	server.games[gameID] = &game
 
 	testcases := getParseCoordsTestCasesInvalidSyntax()
 	for _, testcase := range testcases {
@@ -220,7 +220,7 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.parseMove(req, testcase)
+		is_valid, _, errorResponse := server.parseMove(req, testcase)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
@@ -233,12 +233,12 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 
 func TestServerHandleCreate(t *testing.T) {
 	playerID := "mock_player_1"
-	newServer := NewServer()
+	server := NewServer()
 	req := Request{
 		UserID: playerID,
 	}
 	socketClient := SocketClient{}
-	socketClientResponses := newServer.handleCreate(req, &socketClient)
+	socketClientResponses := server.handleCreate(req, &socketClient)
 	if len(socketClientResponses) != 1 {
 		t.Errorf("Expected 1 response, got %d", len(socketClientResponses))
 	}
@@ -249,7 +249,7 @@ func TestServerHandleCreate(t *testing.T) {
 	}
 
 	gameID := response.GameID
-	game := newServer.games[gameID]
+	game := server.games[gameID]
 	if game == nil {
 		t.Errorf("Expected to find game by id from response")
 	}
@@ -274,22 +274,22 @@ func TestServerHandleCreate(t *testing.T) {
 }
 
 func TestServerHandleJoinSuccess(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	createRequest := Request{
 		UserID: "mock_player_1",
 	}
 
 	socketClient := SocketClient{}
-	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
+	socketClientResponsesCreate := server.handleCreate(createRequest, &socketClient)
 	gameID := socketClientResponsesCreate[0].response.GameID
-	game := newServer.games[gameID]
+	game := server.games[gameID]
 
 	joinRequest := Request{
 		UserID: "mock_player_2",
 	}
 
 	otherSocketClient := SocketClient{}
-	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
+	socketClientResponsesJoin := server.handleJoin(joinRequest, &otherSocketClient, game)
 	if len(socketClientResponsesJoin) != 2 {
 		t.Errorf("Expected 2 responses, got %d", len(socketClientResponsesJoin))
 	}
@@ -321,22 +321,22 @@ func TestServerHandleJoinSuccess(t *testing.T) {
 }
 
 func TestServerHandleJoinAlreadyInRoom(t *testing.T) {
-	newServer := NewServer()
+	server := NewServer()
 	createRequest := Request{
 		UserID: "mock_player_1",
 	}
 
 	socketClient := SocketClient{}
-	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
+	socketClientResponsesCreate := server.handleCreate(createRequest, &socketClient)
 	gameID := socketClientResponsesCreate[0].response.GameID
-	game := newServer.games[gameID]
+	game := server.games[gameID]
 
 	joinRequest := Request{
 		UserID: "mock_player_1",
 	}
 
 	otherSocketClient := SocketClient{}
-	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
+	socketClientResponsesJoin := server.handleJoin(joinRequest, &otherSocketClient, game)
 	if len(socketClientResponsesJoin) != 1 {
 		t.Errorf("Expected 1 response, got %d", len(socketClientResponsesJoin))
 	}
