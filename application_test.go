@@ -6,11 +6,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"go_gomoku/client"
-	"go_gomoku/constants"
-	"go_gomoku/server"
-	"go_gomoku/types"
 )
 
 type incrementalReader struct {
@@ -25,14 +20,14 @@ func (reader incrementalReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func waitForHandledRequest(newClient *client.Client, action string) (types.Request, error) {
+func waitForHandledRequest(newClient *Client, action string) (Request, error) {
 	var err error
-	var request types.Request
-	done := make(chan types.Request)
+	var request Request
+	done := make(chan Request)
 
 	go func() {
 		for {
-			request := <- newClient.HandledRequests
+			request := <- newClient.handledRequests
 			if request.Action == action {
 				done <- request
 				return
@@ -50,12 +45,12 @@ func waitForHandledRequest(newClient *client.Client, action string) (types.Reque
 }
 
 func TestGoGomokuConnectSuccess(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
-	newClient := client.New("Test")
-	newClient.DisablePrint = true
+	newClient := NewClient("Test")
+	newClient.disablePrint = true
 	socketClient := newClient.Connect("localhost", "3003")
 	defer socketClient.Socket.Close()
 
@@ -68,7 +63,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 	}
 
 	// verify sent home
-	request, err := waitForHandledRequest(&newClient, constants.HOME)
+	request, err := waitForHandledRequest(&newClient, HOME)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,16 +73,16 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 }
 
 
-type Player struct {
-	client 			*client.Client
-	socketClient 	*types.SocketClient
+type PlayerBundle struct {
+	client 			*Client
+	socketClient 	*SocketClient
 	reader 			*incrementalReader
 }
 
-func setupClient(t *testing.T) (Player, error) {
+func setupClient(t *testing.T) (PlayerBundle, error) {
 	var err error
-	newClient := client.New("Test")
-	newClient.DisablePrint = true
+	newClient := NewClient("Test")
+	newClient.disablePrint = true
 	newSocketClient := newClient.Connect("localhost", "3003")
 	connected := make(chan bool)
 	reader := incrementalReader{make(chan string)}
@@ -103,7 +98,7 @@ func setupClient(t *testing.T) (Player, error) {
 		newClient.ListenForInput(reader)
 	}()
 
-	player := Player{
+	player := PlayerBundle{
 		&newClient,
 		newSocketClient,
 		&reader,
@@ -111,7 +106,7 @@ func setupClient(t *testing.T) (Player, error) {
 
 	if err == nil {
 		// verify sent home
-		_, homeError := waitForHandledRequest(&newClient, constants.HOME)
+		_, homeError := waitForHandledRequest(&newClient, HOME)
 		if homeError != nil {
 			err = homeError
 		}
@@ -121,7 +116,7 @@ func setupClient(t *testing.T) (Player, error) {
 }
 
 func TestGoGomokuCreateGameSuccess(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -133,7 +128,7 @@ func TestGoGomokuCreateGameSuccess(t *testing.T) {
 
 	// create game
 	player1Bundle.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1Bundle.client, CREATE)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +139,7 @@ func TestGoGomokuCreateGameSuccess(t *testing.T) {
 }
 
 func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -156,14 +151,14 @@ func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 
 	// create game
 	player1Bundle.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1Bundle.client, CREATE)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	player1Bundle.reader.input <- "hm\n"
 	player1Bundle.reader.input <- "y\n"
-	request, err := waitForHandledRequest(player1Bundle.client, constants.HOME)
+	request, err := waitForHandledRequest(player1Bundle.client, HOME)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +169,7 @@ func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 
 
 func TestGoGomokuHomeFromGameUnconfirmed(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -186,21 +181,21 @@ func TestGoGomokuHomeFromGameUnconfirmed(t *testing.T) {
 
 	// create game
 	player1Bundle.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1Bundle.client, CREATE)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// go home but do not confirm
 	player1Bundle.reader.input <- "hm\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	_, err = waitForHandledRequest(player1Bundle.client, HOME)
 	if err == nil {
 		t.Error("Expected to not be sent home")
 	}
 }
 
 func TestGoGomokuHomeFromGameRefused(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -212,7 +207,7 @@ func TestGoGomokuHomeFromGameRefused(t *testing.T) {
 
 	// create game
 	player1Bundle.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1Bundle.client, CREATE)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,14 +215,14 @@ func TestGoGomokuHomeFromGameRefused(t *testing.T) {
 	// go home but type n for confirmation
 	player1Bundle.reader.input <- "hm\n"
 	player1Bundle.reader.input <- "n\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	_, err = waitForHandledRequest(player1Bundle.client, HOME)
 	if err == nil {
 		t.Error("Expected to not be sent home")
 	}
 }
 
 func TestGoGomokuHomeRefresh(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
@@ -239,7 +234,7 @@ func TestGoGomokuHomeRefresh(t *testing.T) {
 
 	// create game
 	player1Bundle.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1Bundle.client, CREATE)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +242,7 @@ func TestGoGomokuHomeRefresh(t *testing.T) {
 	// return home
 	player1Bundle.reader.input <- "hm\n"
 	player1Bundle.reader.input <- "y\n"
-	request, err := waitForHandledRequest(player1Bundle.client, constants.HOME)
+	request, err := waitForHandledRequest(player1Bundle.client, HOME)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,11 +252,11 @@ func TestGoGomokuHomeRefresh(t *testing.T) {
 
 	// refresh home
 	player1Bundle.reader.input <- "hm\n"
-	request, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	request, err = waitForHandledRequest(player1Bundle.client, HOME)
 	if err != nil {
 		t.Error(err)
 	}
-	if request.Action != constants.HOME {
+	if request.Action != HOME {
 		t.Errorf("Expected response action to be HOME, got %s", request.Action)
 	}
 	if len(request.Home) != 1 {
@@ -270,11 +265,11 @@ func TestGoGomokuHomeRefresh(t *testing.T) {
 
 	// refresh home
 	player1Bundle.reader.input <- "hm\n"
-	request, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	request, err = waitForHandledRequest(player1Bundle.client, HOME)
 	if err != nil {
 		t.Error(err)
 	}
-	if request.Action != constants.HOME {
+	if request.Action != HOME {
 		t.Errorf("Expected response action to be HOME, got %s", request.Action)
 	}
 	if len(request.Home) != 1 {
@@ -282,11 +277,11 @@ func TestGoGomokuHomeRefresh(t *testing.T) {
 	}
 }
 
-func setupGame(t *testing.T) (Player, Player, error) {
+func setupGame(t *testing.T) (PlayerBundle, PlayerBundle, error) {
 	// create player 1
 	player1, err := setupClient(t)
 	if err != nil {
-		return player1, Player{}, err
+		return player1, PlayerBundle{}, err
 	}
 
 	// create player 2
@@ -297,7 +292,7 @@ func setupGame(t *testing.T) (Player, Player, error) {
 	
 	// create game
 	player1.reader.input <- "mk\n"
-	_, err = waitForHandledRequest(player1.client, constants.CREATE)
+	_, err = waitForHandledRequest(player1.client, CREATE)
 	if err != nil {
 		return player1, player2, err
 	}
@@ -309,25 +304,25 @@ func setupGame(t *testing.T) (Player, Player, error) {
 
 	// join game
 	player2.reader.input <- "jn " + strconv.Itoa(player1.client.GameID) + "\n"
-	_, err = waitForHandledRequest(player2.client, constants.JOIN)
+	_, err = waitForHandledRequest(player2.client, JOIN)
 	if err != nil {
 		return player1, player2, err
 	}
 
-	_, err = waitForHandledRequest(player1.client, constants.OTHERJOINED)
+	_, err = waitForHandledRequest(player1.client, OTHERJOINED)
 	if err != nil {
 		return player1, player2, err
 	}
 
 	if player2.client.GameID != player1.client.GameID {
-		return player1, player2, errors.New("Players are not in same game")
+		return player1, player2, errors.New("PlayerBundles are not in same game")
 	}
 
 	return player1, player2, nil
 }
 
 func TestGoGomokuJoinGameSuccess(t *testing.T) {
-	newServer := server.New()
+	newServer := NewServer()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 

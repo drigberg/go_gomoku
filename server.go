@@ -1,10 +1,6 @@
-package server
+package main
 
 import (
-	"go_gomoku/board"
-	"go_gomoku/constants"
-	"go_gomoku/helpers"
-	"go_gomoku/types"
 	"log"
 	"math/rand"
 	"net"
@@ -18,15 +14,15 @@ import (
 type GameRoom struct {
 	M 		      sync.Mutex
 	ID            int
-	Players       map[string]*types.Player
+	Players       map[string]*Player
 	Turn          int
-	Board         board.Board
+	Board         Board
 	FirstPlayerID string
 	IsOver        bool
 }
 
 // PlayMove places a piece
-func (game *GameRoom) PlayMove(move types.Coord, color string) {
+func (game *GameRoom) PlayMove(move Coord, color string) {
 	moveStr := move.String()
 	game.Board.Spaces[color][moveStr] = true
 }
@@ -42,7 +38,7 @@ func GetOpponentID(game *GameRoom, userID string) string {
 }
 
 // OtherClient returns the other player's client connection
-func OtherClient(game *GameRoom, userID string) *types.SocketClient {
+func OtherClient(game *GameRoom, userID string) *SocketClient {
 	opponentID := GetOpponentID(game, userID)
 
 	player := game.Players[opponentID]
@@ -71,8 +67,8 @@ type Server struct {
 	wg 			sync.WaitGroup
 }
 
-// New creates a server instances
-func New() Server {
+// NewServer creates a server instances
+func NewServer() Server {
 	return Server{
 		games:  make(map[int]*GameRoom),
 		gameID: 0,
@@ -81,17 +77,17 @@ func New() Server {
 }
 
 // CreateGame creates a game and returns the id
-func (server *Server) CreateGame(req types.Request, socketClient *types.SocketClient) int {
+func (server *Server) CreateGame(req Request, socketClient *SocketClient) int {
 	server.M.Lock()
 	defer server.M.Unlock()
 	defer func() { server.gameID++ }()
 
-	player := types.Player{
+	player := Player{
 		UserID:       req.UserID,
 		SocketClient: socketClient,
 	}
 
-	players := make(map[string]*types.Player)
+	players := make(map[string]*Player)
 
 	players[req.UserID] = &player
 
@@ -99,26 +95,26 @@ func (server *Server) CreateGame(req types.Request, socketClient *types.SocketCl
 		ID:      server.gameID,
 		Players: players,
 		Turn:    0,
-		Board:   board.New(),
+		Board:   NewBoard(),
 	}
 
 	return server.gameID
 }
 
 // ParseMove validates the string from a mv command
-func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.Coord, types.Request) {
+func (server *Server) ParseMove(req Request, moveStr string) (bool, Coord, Request) {
 	coordinates := strings.Split(moveStr, " ")
 
 	if len(coordinates) != 2 {
-		errorResponse := types.Request{
+		errorResponse := Request{
 			GameID:  req.GameID,
 			UserID:  req.UserID,
-			Action:  constants.MOVE,
+			Action:  MOVE,
 			Data:    "The syntax for a move is mv <x> <y>",
 			Success: false,
 		}
 
-		return false, types.Coord{}, errorResponse
+		return false, Coord{}, errorResponse
 	}
 
 	x, xErr := strconv.Atoi(coordinates[0])
@@ -128,33 +124,33 @@ func (server *Server) ParseMove(req types.Request, moveStr string) (bool, types.
 	notInRange := x < 1 || x > 15 || y < 1 || y > 15
 
 	if isNil || notInRange {
-		errorResponse := types.Request{
+		errorResponse := Request{
 			GameID:  req.GameID,
 			UserID:  req.UserID,
-			Action:  constants.MOVE,
+			Action:  MOVE,
 			Data:    "Both x and y must be integers from 1 to 15",
 			Success: false,
 		}
 
-		return false, types.Coord{}, errorResponse
+		return false, Coord{}, errorResponse
 	}
 
-	move := types.Coord{
+	move := Coord{
 		X: x,
 		Y: y,
 	}
 
 	ok, errorResponse := server.games[req.GameID].Board.CheckOwnership(req.GameID, req.UserID, move)
 	if !ok {
-		return false, types.Coord{}, errorResponse
+		return false, Coord{}, errorResponse
 	}
 
-	return true, move, types.Request{}
+	return true, move, Request{}
 }
 
 type SocketClientResponse struct {
-	socketClient *types.SocketClient
-	response types.Request
+	socketClient *SocketClient
+	response Request
 }
 
 // SendBackoff tries to send and keeps trying
@@ -181,7 +177,7 @@ func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int
 
 // SendToClient tries to send a request to socketClient, with backoff
 func (socketClientResponse *SocketClientResponse) send() {
-	data, err := helpers.GobToBytes(socketClientResponse.response)
+	data, err := GobToBytes(socketClientResponse.response)
 
 	if err != nil {
 		log.Println(err)
@@ -191,11 +187,11 @@ func (socketClientResponse *SocketClientResponse) send() {
 	socketClientResponse.sendBackoff(data, 1)
 }
 
-func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) []SocketClientResponse {
+func (server *Server) handleCreate(req Request, socketClient *SocketClient) []SocketClientResponse {
 	gameID := server.CreateGame(req, socketClient)
-	response := types.Request{
+	response := Request{
 		GameID:  gameID,
-		Action:  constants.CREATE,
+		Action:  CREATE,
 		Success: true,
 	}
 	return []SocketClientResponse{
@@ -206,13 +202,13 @@ func (server *Server) handleCreate(req types.Request, socketClient *types.Socket
 	}
 }
 
-func (server *Server) handleJoin(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
+func (server *Server) handleJoin(req Request, socketClient *SocketClient, activeGame *GameRoom) []SocketClientResponse {
 	otherClient := OtherClient(activeGame, req.UserID)
 
 	if otherClient == nil {
-		response := types.Request{
+		response := Request{
 			GameID:  req.GameID,
-			Action:  constants.JOIN,
+			Action:  JOIN,
 			Success: false,
 			Data:    "You are already in this room, and you can't go back! Sorry!",
 		}
@@ -226,9 +222,9 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 	}
 
 	if len(activeGame.Players) == 2 {
-		response := types.Request{
+		response := Request{
 			GameID:  req.GameID,
-			Action:  constants.JOIN,
+			Action:  JOIN,
 			Success: false,
 			Data:    "Game is full already",
 		}
@@ -242,9 +238,9 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 	}
 
 	if otherClient.Closed {
-		response := types.Request{
+		response := Request{
 			GameID:  req.GameID,
-			Action:  constants.JOIN,
+			Action:  JOIN,
 			Success: false,
 			Data:    "Other player already left that game",
 		}
@@ -257,7 +253,7 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 		}
 	}
 
-	player := types.Player{
+	player := Player{
 		UserID:       req.UserID,
 		SocketClient: socketClient,
 	}
@@ -271,20 +267,20 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 	}
 
 	// OpponentID is used to alert player to opponent's ID -- should be in Data
-	response1 := types.Request{
+	response1 := Request{
 		GameID:   req.GameID,
 		UserID:   opponentID,
-		Action:   constants.JOIN,
+		Action:   JOIN,
 		YourTurn: activeGame.FirstPlayerID == req.UserID,
 		Success:  true,
 		Turn:     activeGame.Turn,
 	}
 
 	// Req.UserID is used to alert player to new player ID -- should be in Data
-	response2 := types.Request{
+	response2 := Request{
 		GameID:   req.GameID,
 		UserID:   req.UserID,
-		Action:   constants.OTHERJOINED,
+		Action:   OTHERJOINED,
 		YourTurn: activeGame.FirstPlayerID != req.UserID,
 		Success:  true,
 		Turn:     activeGame.Turn,
@@ -302,11 +298,11 @@ func (server *Server) handleJoin(req types.Request, socketClient *types.SocketCl
 	}
 }
 
-func (server *Server) handleMessage(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
-	response := types.Request{
+func (server *Server) handleMessage(req Request, socketClient *SocketClient, activeGame *GameRoom) []SocketClientResponse {
+	response := Request{
 		GameID:  req.GameID,
 		UserID:  req.UserID,
-		Action:  constants.MESSAGE,
+		Action:  MESSAGE,
 		Data:    req.Data,
 		Success: true,
 	}
@@ -320,11 +316,11 @@ func (server *Server) handleMessage(req types.Request, socketClient *types.Socke
 	}
 }
 
-func (server *Server) handleMove(req types.Request, socketClient *types.SocketClient, activeGame *GameRoom) []SocketClientResponse {
-	response := types.Request{
+func (server *Server) handleMove(req Request, socketClient *SocketClient, activeGame *GameRoom) []SocketClientResponse {
+	response := Request{
 		GameID: req.GameID,
 		UserID: req.UserID,
-		Action: constants.MOVE,
+		Action: MOVE,
 	}
 
 	valid := IsTurn(activeGame, req.UserID)
@@ -332,10 +328,10 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 	var message string
 
 	if !valid {
-		errorResponse := types.Request{
+		errorResponse := Request{
 			GameID:  req.GameID,
 			UserID:  req.UserID,
-			Action:  constants.MOVE,
+			Action:  MOVE,
 			Data:    "It's not your turn!",
 			Success: false,
 		}
@@ -353,10 +349,10 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 		if activeGame.Turn == 1 {
 			moveStrs := strings.Split(req.Data, ", ")
 			if len(moveStrs) != 3 {
-				errorResponse := types.Request{
+				errorResponse := Request{
 					GameID:  req.GameID,
 					UserID:  req.UserID,
-					Action:  constants.MOVE,
+					Action:  MOVE,
 					Data:    "Please choose exectly three sets of two values",
 					Success: false,
 				}
@@ -369,7 +365,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 				}
 			}
 
-			moves := [3]types.Coord{}
+			moves := [3]Coord{}
 			for i, moveStr := range moveStrs {
 				ok, move, errorResponse := server.ParseMove(req, moveStr)
 
@@ -456,7 +452,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 	}
 
 	otherClient := OtherClient(activeGame, req.UserID)
-	otherClientResponse := types.Request{
+	otherClientResponse := Request{
 		YourTurn: true,
 		GameID: response.GameID,
 		UserID: response.UserID,
@@ -483,7 +479,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 }
 
 // HandleRequest handles a request
-func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
+func (server *Server) HandleRequest(req Request, socketClient *SocketClient) {
 	log.Println("Request:", socketClient, req)
 
 	activeGame := server.games[req.GameID]
@@ -494,15 +490,15 @@ func (server *Server) HandleRequest(req types.Request, socketClient *types.Socke
 
 	socketClientResponses := []SocketClientResponse{}
 	switch action := req.Action; action {
-	case constants.CREATE:
+	case CREATE:
 		socketClientResponses = server.handleCreate(req, socketClient)
-	case constants.JOIN:
+	case JOIN:
 		socketClientResponses = server.handleJoin(req, socketClient, activeGame)
-	case constants.MESSAGE:
+	case MESSAGE:
 		socketClientResponses = server.handleMessage(req, socketClient, activeGame)
-	case constants.MOVE:
+	case MOVE:
 		socketClientResponses = server.handleMove(req, socketClient, activeGame)
-	case constants.HOME:
+	case HOME:
 		socketClientResponses = server.handleSendToHome(socketClient)
 	default:
 		log.Println("Unrecognized action:", req.Action)
@@ -513,8 +509,8 @@ func (server *Server) HandleRequest(req types.Request, socketClient *types.Socke
 	}
 }
 
-func (server *Server) handleSendToHome(socketClient *types.SocketClient) []SocketClientResponse {
-	home := []types.OpenRoom{}
+func (server *Server) handleSendToHome(socketClient *SocketClient) []SocketClientResponse {
+	home := []OpenRoom{}
 
 	for _, game := range server.games {
 		if !game.IsOver && len(game.Players) == 1 {
@@ -523,7 +519,7 @@ func (server *Server) handleSendToHome(socketClient *types.SocketClient) []Socke
 				userID = id
 			}
 
-			openRoom := types.OpenRoom{
+			openRoom := OpenRoom{
 				ID:     game.ID,
 				UserID: userID,
 			}
@@ -532,8 +528,8 @@ func (server *Server) handleSendToHome(socketClient *types.SocketClient) []Socke
 		}
 	}
 
-	response := types.Request{
-		Action: constants.HOME,
+	response := Request{
+		Action: HOME,
 		Home:   home,
 	}
 
@@ -564,9 +560,9 @@ func (server *Server) Listen(port string) {
 	
 	// create socket socketClient manager
 	socketClientManager := SocketClientManager{
-		clients:    make(map[*types.SocketClient]bool),
-		register:   make(chan *types.SocketClient),
-		unregister: make(chan *types.SocketClient),
+		clients:    make(map[*SocketClient]bool),
+		register:   make(chan *SocketClient),
+		unregister: make(chan *SocketClient),
 	}
 
 	go socketClientManager.start()
@@ -584,7 +580,7 @@ func (server *Server) Listen(port string) {
 			}
 		} else {
 			server.wg.Add(1)
-			socketClient := &types.SocketClient{Socket: connection, Data: make(chan []byte)}
+			socketClient := &SocketClient{Socket: connection, Data: make(chan []byte)}
 			socketClientManager.register <- socketClient
 			go func() {
 				socketClientManager.receive(socketClient, server)
@@ -602,13 +598,13 @@ func (server *Server) Listen(port string) {
 
 // SocketClientManager handles all clients
 type SocketClientManager struct {
-	clients    map[*types.SocketClient]bool
-	register   chan *types.SocketClient
-	unregister chan *types.SocketClient
+	clients    map[*SocketClient]bool
+	register   chan *SocketClient
+	unregister chan *SocketClient
 }
 
 // CloseSocket safely closes socket connection
-func CloseSocket(socketClient *types.SocketClient) {
+func CloseSocket(socketClient *SocketClient) {
 	socketClient.M.Lock()
 	defer socketClient.M.Unlock()
 
@@ -618,13 +614,13 @@ func CloseSocket(socketClient *types.SocketClient) {
 	}
 }
 
-func (manager *SocketClientManager) receive(socketClient *types.SocketClient, server *Server) {
+func (manager *SocketClientManager) receive(socketClient *SocketClient, server *Server) {
 	for {
 		message := make([]byte, 4096)
 		length, err := socketClient.Socket.Read(message)
 
 		if length > 0 {
-			request := helpers.DecodeGob(message)
+			request := DecodeGob(message)
 			server.HandleRequest(request, socketClient)
 		}
 
@@ -637,7 +633,7 @@ func (manager *SocketClientManager) receive(socketClient *types.SocketClient, se
 	}
 }
 
-func (manager *SocketClientManager) send(socketClient *types.SocketClient) {
+func (manager *SocketClientManager) send(socketClient *SocketClient) {
 	for {
 		select {
 		case message, ok := <-socketClient.Data:

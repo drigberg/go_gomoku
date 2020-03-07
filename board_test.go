@@ -1,15 +1,14 @@
-package board
+package main
 
 import (
-	"go_gomoku/types"
 	"testing"
 )
 
-func coordsAreEqual(coord1 *types.Coord, coord2 *types.Coord) bool {
+func coordsAreEqual(coord1 *Coord, coord2 *Coord) bool {
 	return coord1.X == coord2.X && coord1.Y == coord2.Y
 }
 
-func coordSlicesAreEqual(slice1 *[]types.Coord, slice2 *[]types.Coord) bool {
+func coordSlicesAreEqual(slice1 *[]Coord, slice2 *[]Coord) bool {
 	if len(*slice1) != len(*slice2) {
 		return false
 	}
@@ -24,12 +23,12 @@ func coordSlicesAreEqual(slice1 *[]types.Coord, slice2 *[]types.Coord) bool {
 	return true
 }
 
-func getWinningCoordsSlices(gameBoard *Board) (*[]types.Coord, *[]types.Coord) {
-	winningCoordsWhite := []types.Coord{}
-	winningCoordsBlack := []types.Coord{}
+func getWinningCoordsSlices(gameBoard *Board) (*[]Coord, *[]Coord) {
+	winningCoordsWhite := []Coord{}
+	winningCoordsBlack := []Coord{}
 	for x := 0; x < 15; x++ {
 		for y := 0; y < 15; y++ {
-			coord := types.Coord{X: x, Y: y}
+			coord := Coord{X: x, Y: y}
 			if (*gameBoard).CheckForWin(coord, "white") {
 				winningCoordsWhite = append(winningCoordsWhite, coord)
 			}
@@ -42,7 +41,7 @@ func getWinningCoordsSlices(gameBoard *Board) (*[]types.Coord, *[]types.Coord) {
 }
 
 func TestBoardNew(t *testing.T) {
-	gameBoard := New()
+	gameBoard := NewBoard()
 	if gameBoard.Spaces == nil {
 		t.Error("Expected board.Spaces to not be nil")
 	}
@@ -64,7 +63,7 @@ func TestBoardNew(t *testing.T) {
 }
 
 func TestBoardCheckForWinEmpty(t *testing.T) {
-	gameBoard := New()
+	gameBoard := NewBoard()
 	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
 	if len(*winningCoordsWhite) > 0 {
 		t.Errorf("Expected no winning spaces for white, found %d", len(*winningCoordsWhite))
@@ -77,7 +76,7 @@ func TestBoardCheckForWinEmpty(t *testing.T) {
 type BoardCheckForWinSuccessTestCase struct {
 	label                 string
 	coordStrings          []string
-	expectedWinningCoords []types.Coord
+	expectedWinningCoords []Coord
 }
 
 func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
@@ -85,45 +84,45 @@ func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 		BoardCheckForWinSuccessTestCase{
 			"horizontal",
 			[]string{"3 3", "4 3", "5 3", "6 3", "7 3"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 4, Y: 3},
-				types.Coord{X: 5, Y: 3},
-				types.Coord{X: 6, Y: 3},
-				types.Coord{X: 7, Y: 3},
+			[]Coord{
+				Coord{X: 3, Y: 3},
+				Coord{X: 4, Y: 3},
+				Coord{X: 5, Y: 3},
+				Coord{X: 6, Y: 3},
+				Coord{X: 7, Y: 3},
 			},
 		},
 		BoardCheckForWinSuccessTestCase{
 			"diagonal_right",
 			[]string{"3 3", "4 4", "5 5", "6 6", "7 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 4, Y: 4},
-				types.Coord{X: 5, Y: 5},
-				types.Coord{X: 6, Y: 6},
-				types.Coord{X: 7, Y: 7},
+			[]Coord{
+				Coord{X: 3, Y: 3},
+				Coord{X: 4, Y: 4},
+				Coord{X: 5, Y: 5},
+				Coord{X: 6, Y: 6},
+				Coord{X: 7, Y: 7},
 			},
 		},
 		BoardCheckForWinSuccessTestCase{
 			"vertical",
 			[]string{"3 3", "3 4", "3 5", "3 6", "3 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 3},
-				types.Coord{X: 3, Y: 4},
-				types.Coord{X: 3, Y: 5},
-				types.Coord{X: 3, Y: 6},
-				types.Coord{X: 3, Y: 7},
+			[]Coord{
+				Coord{X: 3, Y: 3},
+				Coord{X: 3, Y: 4},
+				Coord{X: 3, Y: 5},
+				Coord{X: 3, Y: 6},
+				Coord{X: 3, Y: 7},
 			},
 		},
 		BoardCheckForWinSuccessTestCase{
 			"diagonal_left",
 			[]string{"7 3", "6 4", "5 5", "4 6", "3 7"},
-			[]types.Coord{
-				types.Coord{X: 3, Y: 7},
-				types.Coord{X: 4, Y: 6},
-				types.Coord{X: 5, Y: 5},
-				types.Coord{X: 6, Y: 4},
-				types.Coord{X: 7, Y: 3},
+			[]Coord{
+				Coord{X: 3, Y: 7},
+				Coord{X: 4, Y: 6},
+				Coord{X: 5, Y: 5},
+				Coord{X: 6, Y: 4},
+				Coord{X: 7, Y: 3},
 			},
 		},
 	}
@@ -134,7 +133,7 @@ func TestBoardCheckForWinSuccessWhite(t *testing.T) {
 	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
-			gameBoard := New()
+			gameBoard := NewBoard()
 			for _, coordString := range testcase.coordStrings {
 				gameBoard.Spaces["white"][coordString] = true
 			}
@@ -156,7 +155,7 @@ func TestBoardCheckForWinSuccessBlack(t *testing.T) {
 	testcases := getCheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
-			gameBoard := New()
+			gameBoard := NewBoard()
 			for _, coordString := range testcase.coordStrings {
 				gameBoard.Spaces["black"][coordString] = true
 			}

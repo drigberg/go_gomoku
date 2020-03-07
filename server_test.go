@@ -1,42 +1,39 @@
-package server
+package main
 
 import (
 	"testing"
-	"go_gomoku/board"
-	"go_gomoku/constants"
-	"go_gomoku/types"
 )
 
 type ParseCoordsTestCase struct {
 	input         string
-	expectedMove types.Coord
+	expectedMove Coord
 }
 
 func getValidParseCoordsTestCases() []ParseCoordsTestCase {
 	testcases := []ParseCoordsTestCase{
 		ParseCoordsTestCase{
 			"3 3",
-			types.Coord{X: 3, Y: 3},
+			Coord{X: 3, Y: 3},
 		},
 		ParseCoordsTestCase{
 			"4 4",
-			types.Coord{X: 4, Y: 4},
+			Coord{X: 4, Y: 4},
 		},
 		ParseCoordsTestCase{
 			"1 1",
-			types.Coord{X: 1, Y: 1},
+			Coord{X: 1, Y: 1},
 		},
 		ParseCoordsTestCase{
 			"15 15",
-			types.Coord{X: 15, Y: 15},
+			Coord{X: 15, Y: 15},
 		},
 		ParseCoordsTestCase{
 			"1 15",
-			types.Coord{X: 1, Y: 15},
+			Coord{X: 1, Y: 15},
 		},
 		ParseCoordsTestCase{
 			"15 1",
-			types.Coord{X: 15, Y: 1},
+			Coord{X: 15, Y: 1},
 		},
 	}
 	return testcases
@@ -72,18 +69,18 @@ func getParseCoordsTestCasesInvalidSyntax() []string {
 }
 
 func TestServerParseCoordsValid(t *testing.T) {
-	newServer := New()
+	newServer := NewServer()
 	gameID := 3
-	player1 := types.Player{
+	player1 := Player{
 		UserID:       "mock_user1",
 		Color: "white",
 
 	}
-	player2 := types.Player{
+	player2 := Player{
 		UserID:       "mock_user2",
 		Color: "black",
 	}
-	players := make(map[string]*types.Player)
+	players := make(map[string]*Player)
 	players[player1.UserID] = &player1
 	players[player2.UserID] = &player2
 
@@ -91,12 +88,12 @@ func TestServerParseCoordsValid(t *testing.T) {
 		ID:      gameID,
 		Players: players,
 		Turn:    0,
-		Board:   board.New(),
+		Board:   NewBoard(),
 	}
 
 	testcases := getValidParseCoordsTestCases()
 	for _, testcase := range testcases {
-		req := types.Request{
+		req := Request{
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
@@ -114,17 +111,17 @@ func TestServerParseCoordsValid(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidTaken(t *testing.T) {
-	newServer := New()
+	newServer := NewServer()
 	gameID := 3
-	player1 := types.Player{
+	player1 := Player{
 		UserID:       "mock_user1",
 		Color: "white",
 	}
-	player2 := types.Player{
+	player2 := Player{
 		UserID:       "mock_user2",
 		Color: "black",
 	}
-	players := make(map[string]*types.Player)
+	players := make(map[string]*Player)
 	players[player1.UserID] = &player1
 	players[player2.UserID] = &player2
 
@@ -132,14 +129,14 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 		ID:      gameID,
 		Players: players,
 		Turn:    0,
-		Board:   board.New(),
+		Board:   NewBoard(),
 	}
 	newServer.games[gameID] = &game
 
 	testcases := getValidParseCoordsTestCases()
 	for _, testcase := range testcases {
 		game.PlayMove(testcase.expectedMove, game.Players[player1.UserID].Color)
-		req := types.Request{
+		req := Request{
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
@@ -155,17 +152,17 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
-	newServer := New()
+	newServer := NewServer()
 	gameID := 3
-	player1 := types.Player{
+	player1 := Player{
 		UserID:       "mock_user1",
 		Color: "white",
 	}
-	player2 := types.Player{
+	player2 := Player{
 		UserID:       "mock_user2",
 		Color: "black",
 	}
-	players := make(map[string]*types.Player)
+	players := make(map[string]*Player)
 	players[player1.UserID] = &player1
 	players[player2.UserID] = &player2
 
@@ -173,13 +170,13 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 		ID:      gameID,
 		Players: players,
 		Turn:    0,
-		Board:   board.New(),
+		Board:   NewBoard(),
 	}
 	newServer.games[gameID] = &game
 
 	testcases := getInvalidParseCoordsTestCasesOffBoardOrNonNumber()
 	for _, testcase := range testcases {
-		req := types.Request{
+		req := Request{
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
@@ -195,17 +192,17 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 }
 
 func TestServerParseCoordsInvalidSyntax(t *testing.T) {
-	newServer := New()
+	newServer := NewServer()
 	gameID := 3
-	player1 := types.Player{
+	player1 := Player{
 		UserID:       "mock_user1",
 		Color: "white",
 	}
-	player2 := types.Player{
+	player2 := Player{
 		UserID:       "mock_user2",
 		Color: "black",
 	}
-	players := make(map[string]*types.Player)
+	players := make(map[string]*Player)
 	players[player1.UserID] = &player1
 	players[player2.UserID] = &player2
 
@@ -213,13 +210,13 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 		ID:      gameID,
 		Players: players,
 		Turn:    0,
-		Board:   board.New(),
+		Board:   NewBoard(),
 	}
 	newServer.games[gameID] = &game
 
 	testcases := getParseCoordsTestCasesInvalidSyntax()
 	for _, testcase := range testcases {
-		req := types.Request{
+		req := Request{
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
@@ -236,18 +233,18 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 
 func TestServerHandleCreate(t *testing.T) {
 	playerID := "mock_player_1"
-	newServer := New()
-	req := types.Request{
+	newServer := NewServer()
+	req := Request{
 		UserID: playerID,
 	}
-	socketClient := types.SocketClient{}
+	socketClient := SocketClient{}
 	socketClientResponses := newServer.handleCreate(req, &socketClient)
 	if len(socketClientResponses) != 1 {
 		t.Errorf("Expected 1 response, got %d", len(socketClientResponses))
 	}
 	response := socketClientResponses[0].response
 
-	if response.Action != constants.CREATE {
+	if response.Action != CREATE {
 		t.Errorf("Expected response to be type CREATE, got %s", response.Action)
 	}
 
@@ -277,27 +274,27 @@ func TestServerHandleCreate(t *testing.T) {
 }
 
 func TestServerHandleJoinSuccess(t *testing.T) {
-	newServer := New()
-	createRequest := types.Request{
+	newServer := NewServer()
+	createRequest := Request{
 		UserID: "mock_player_1",
 	}
 
-	socketClient := types.SocketClient{}
+	socketClient := SocketClient{}
 	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
 	gameID := socketClientResponsesCreate[0].response.GameID
 	game := newServer.games[gameID]
 
-	joinRequest := types.Request{
+	joinRequest := Request{
 		UserID: "mock_player_2",
 	}
 
-	otherSocketClient := types.SocketClient{}
+	otherSocketClient := SocketClient{}
 	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
 	if len(socketClientResponsesJoin) != 2 {
 		t.Errorf("Expected 2 responses, got %d", len(socketClientResponsesJoin))
 	}
 
-	responses := []types.Request{socketClientResponsesJoin[0].response, socketClientResponsesJoin[1].response}
+	responses := []Request{socketClientResponsesJoin[0].response, socketClientResponsesJoin[1].response}
 
 	for i, response := range responses {
 		if response.GameID != gameID {
@@ -308,11 +305,11 @@ func TestServerHandleJoinSuccess(t *testing.T) {
 		if response.YourTurn != expectedYourTurn {
 			t.Errorf("Expected response %d for player %s to have YourTurn %t, got %t", i, response.UserID, expectedYourTurn, response.YourTurn)
 		}
-		if response.UserID == joinRequest.UserID && response.Action != constants.OTHERJOINED {
-			t.Errorf("Expected response %d to have action OTHERJOINED, got %s", i, constants.OTHERJOINED)
+		if response.UserID == joinRequest.UserID && response.Action != OTHERJOINED {
+			t.Errorf("Expected response %d to have action OTHERJOINED, got %s", i, OTHERJOINED)
 		}
-		if response.UserID == createRequest.UserID && response.Action != constants.JOIN {
-			t.Errorf("Expected response %d to have action JOIN, got %s", i, constants.JOIN)
+		if response.UserID == createRequest.UserID && response.Action != JOIN {
+			t.Errorf("Expected response %d to have action JOIN, got %s", i, JOIN)
 		}
 		if response.Success != true {
 			t.Errorf("Expected response %d to have success=true", i)
@@ -324,21 +321,21 @@ func TestServerHandleJoinSuccess(t *testing.T) {
 }
 
 func TestServerHandleJoinAlreadyInRoom(t *testing.T) {
-	newServer := New()
-	createRequest := types.Request{
+	newServer := NewServer()
+	createRequest := Request{
 		UserID: "mock_player_1",
 	}
 
-	socketClient := types.SocketClient{}
+	socketClient := SocketClient{}
 	socketClientResponsesCreate := newServer.handleCreate(createRequest, &socketClient)
 	gameID := socketClientResponsesCreate[0].response.GameID
 	game := newServer.games[gameID]
 
-	joinRequest := types.Request{
+	joinRequest := Request{
 		UserID: "mock_player_1",
 	}
 
-	otherSocketClient := types.SocketClient{}
+	otherSocketClient := SocketClient{}
 	socketClientResponsesJoin := newServer.handleJoin(joinRequest, &otherSocketClient, game)
 	if len(socketClientResponsesJoin) != 1 {
 		t.Errorf("Expected 1 response, got %d", len(socketClientResponsesJoin))
@@ -346,7 +343,7 @@ func TestServerHandleJoinAlreadyInRoom(t *testing.T) {
 
 	response := socketClientResponsesJoin[0].response
 
-	if response.Action != constants.JOIN {
+	if response.Action != JOIN {
 		t.Errorf("Expected response to be type JOIN, got %s", response.Action)
 	}
 

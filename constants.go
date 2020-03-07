@@ -1,4 +1,4 @@
-package constants
+package main
 
 // constants
 const (

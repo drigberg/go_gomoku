@@ -1,15 +1,16 @@
-package board
+package main
 
 import (
 	"fmt"
-	"go_gomoku/constants"
-	"go_gomoku/types"
 	"strconv"
 	"strings"
 )
 
 var (
 	axes                  = [4][2]int{[2]int{-1, -1}, [2]int{-1, 0}, [2]int{-1, 1}, [2]int{0, -1}}
+)
+
+const (
 	topLeft               = "\u250F"
 	bottomLeft            = "\u2517"
 	topRight              = "\u2513"
@@ -38,26 +39,26 @@ type Board struct {
 	Spaces map[string]map[string]bool
 }
 
-// Interface defines methods a Board should implement
-type Interface interface {
-	CheckForWin(types.Coord, string) bool
-	CheckOwnership(int, string, types.Coord) (bool, types.Request)
+// BoardInterface defines methods a Board should implement
+type BoardInterface interface {
+	CheckForWin(Coord, string) bool
+	CheckOwnership(int, string, Coord) (bool, Request)
 	PrintBoard()
-	checkAlongAxis(string, [2]int, types.Coord, int) int
+	checkAlongAxis(string, [2]int, Coord, int) int
 	getAxisLabel(int, int) string
 	getColorCode(string) string
 	getColumnChar(int, int) string
-	getCoord(int, int) types.Coord
+	getCoord(int, int) Coord
 	getRowChar(int, int, string, string) string
 	intersectionOrSpace(string, string, string, bool) string
-	isTakenBy(types.Coord) string
+	isTakenBy(Coord) string
 }
 
 // assert that Board implements Interface
-var _ Interface = (*Board)(nil)
+var _ BoardInterface = (*Board)(nil)
 
 // New creates an empty board
-func New() Board {
+func NewBoard() Board {
 	spaces := make(map[string]map[string]bool)
 	spaces["white"] = make(map[string]bool)
 	spaces["black"] = make(map[string]bool)
@@ -68,8 +69,8 @@ func New() Board {
 
 // PrintBoard prints the board
 func (board *Board) PrintBoard() {
-	prevOccupied := constants.FREE
-	occupied := constants.FREE
+	prevOccupied := FREE
+	occupied := FREE
 
 	for y := 0; y <= 29; y++ {
 		row := ""
@@ -97,8 +98,8 @@ func (board *Board) PrintBoard() {
 	}
 }
 
-func (board *Board) checkAlongAxis(color string, axis [2]int, move types.Coord, num int) int {
-	next := types.Coord{
+func (board *Board) checkAlongAxis(color string, axis [2]int, move Coord, num int) int {
+	next := Coord{
 		X: move.X + axis[0],
 		Y: move.Y + axis[1],
 	}
@@ -117,7 +118,7 @@ func (board *Board) checkAlongAxis(color string, axis [2]int, move types.Coord, 
 }
 
 // CheckForWin looks for five in a row from a position
-func (board *Board) CheckForWin(move types.Coord, color string) bool {
+func (board *Board) CheckForWin(move Coord, color string) bool {
 	// check within color from move coordinates
 	for _, axis := range axes {
 		len := board.checkAlongAxis(color, axis, move, 1)
@@ -132,7 +133,7 @@ func (board *Board) CheckForWin(move types.Coord, color string) bool {
 	return false
 }
 
-func (board *Board) isTakenBy(move types.Coord) string {
+func (board *Board) isTakenBy(move Coord) string {
 	spotStr := move.String()
 
 	for color := range board.Spaces {
@@ -141,7 +142,7 @@ func (board *Board) isTakenBy(move types.Coord) string {
 		}
 	}
 
-	return constants.FREE
+	return FREE
 }
 
 func (board *Board) getColorCode(color string) string {
@@ -153,7 +154,7 @@ func (board *Board) getColorCode(color string) string {
 
 func (board *Board) intersectionOrSpace(horizontal string, intersection string, occupied string, spaceFirst bool) string {
 	space := intersection
-	if occupied != constants.FREE {
+	if occupied != FREE {
 		space = board.getColorCode(occupied)
 	}
 
@@ -165,12 +166,12 @@ func (board *Board) intersectionOrSpace(horizontal string, intersection string, 
 }
 
 // CheckOwnership checks if a move can be placed
-func (board *Board) CheckOwnership(gameID int, userID string, move types.Coord) (bool, types.Request) {
-	if board.isTakenBy(move) != constants.FREE {
-		errorResponse := types.Request{
+func (board *Board) CheckOwnership(gameID int, userID string, move Coord) (bool, Request) {
+	if board.isTakenBy(move) != FREE {
+		errorResponse := Request{
 			GameID:  gameID,
 			UserID:  userID,
-			Action:  constants.MOVE,
+			Action:  MOVE,
 			Data:    "That spot is already taken!",
 			Success: false,
 		}
@@ -178,13 +179,13 @@ func (board *Board) CheckOwnership(gameID int, userID string, move types.Coord) 
 		return false, errorResponse
 	}
 
-	return true, types.Request{}
+	return true, Request{}
 }
 
 func (board *Board) getRowChar(x int, y int, occupied string, prevOccupied string) string {
 	HORIZONTALS := [3]string{horizontal, horizontal2, horizontal3}
 
-	if prevOccupied != constants.FREE {
+	if prevOccupied != FREE {
 		HORIZONTALS[0] = horizontalAfterPiece
 		HORIZONTALS[1] = horizontal2AfterPiece
 		HORIZONTALS[2] = horizontal3AfterPiece
@@ -250,8 +251,8 @@ func (board *Board) getColumnChar(x int, y int) string {
 	return space2
 }
 
-func (board *Board) getCoord(x int, y int) types.Coord {
-	coord := types.Coord{
+func (board *Board) getCoord(x int, y int) Coord {
+	coord := Coord{
 		X: 0,
 		Y: 0,
 	}

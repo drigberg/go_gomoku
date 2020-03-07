@@ -1,12 +1,8 @@
-package client
+package main
 
 import (
 	"bufio"
 	"fmt"
-	"go_gomoku/board"
-	"go_gomoku/constants"
-	"go_gomoku/helpers"
-	"go_gomoku/types"
 	"io"
 	"log"
 	"net"
@@ -19,11 +15,9 @@ import (
 
 // Client runs the CLI for players
 type Client struct {
-	// DisablePrint ensures that screen isn't cleared, etc during tests
-	DisablePrint  	bool
-	// HandledRequests allows us to await request handling in tests
-	HandledRequests chan types.Request
-	messages      	[]types.Message
+	disablePrint  	bool
+	handledRequests chan Request
+	messages      	[]Message
 	serverName    	string
 	GameID        	int
 	userID        	string
@@ -34,11 +28,11 @@ type Client struct {
 	connection    	net.Conn
 	yourTurn      	bool
 	turn          	int
-	board         	board.Board
+	board         	Board
 }
 
 // Interface defines methods a Client should implement
-type Interface interface {
+type ClientInterface interface {
 	Run(string, string)
 	Handler([]byte)
 	CreateGame()
@@ -48,33 +42,33 @@ type Interface interface {
 	clearScreen()
 	getTurnOneInstructions() string
 	getTurnTwoInstructions() string
-	handleCreateRequest(types.Request)
-	handleHomeRequest(types.Request)
-	handleJoinRequest(types.Request)
-	handleMessageRequest(types.Request)
-	handleMoveRequest(types.Request)
-	handleOtherJoinedRequest(types.Request)
+	handleCreateRequest(Request)
+	handleHomeRequest(Request)
+	handleJoinRequest(Request)
+	handleMessageRequest(Request)
+	handleMoveRequest(Request)
+	handleOtherJoinedRequest(Request)
 	joinGame(string)
 	makeMove(string)
 	printBoard()
 	printBoardAndMessages()
 	printError(err error)
-	printHomeScreen(types.Request)
+	printHomeScreen(Request)
 	printMessages()
 	printString(message string)
 	printTurn()
 	sendMessage(string)
-	sendToServer(types.Request)
+	sendToServer(Request)
 }
 
 // assert that Board implements Interface
-var _ Interface = (*Client)(nil)
+var _ ClientInterface = (*Client)(nil)
 
 // New creates a client instance
-func New(serverName string) Client {
+func NewClient(serverName string) Client {
 	client := Client{
 		serverName: serverName,
-		HandledRequests: make(chan types.Request),
+		handledRequests: make(chan Request),
 	}
 	client.reset()
 	return client
@@ -86,31 +80,31 @@ func (client *Client) reset() {
 	client.opponentID = ""
 	client.yourColor = ""
 	client.opponentColor = ""
-	client.messages = []types.Message{}
+	client.messages = []Message{}
 	client.turn = 0
-	client.board = board.New()
+	client.board = NewBoard()
 }
 
 func (client *Client) clearScreen() {
-	if !client.DisablePrint {
-		helpers.ClearScreen()
+	if !client.disablePrint {
+		ClearScreen()
 	}
 }
 
 func (client *Client) printBoard() {
-	if !client.DisablePrint {
+	if !client.disablePrint {
 		client.board.PrintBoard()
 	}
 }
 
 func (client *Client) printString(message string) {
-	if !client.DisablePrint {
+	if !client.disablePrint {
 		fmt.Println(message)
 	}
 }
 
 func (client *Client) printError(err error) {
-	if !client.DisablePrint {
+	if !client.disablePrint {
 		fmt.Println(err)
 	}
 }
@@ -148,7 +142,7 @@ func (client *Client) printMessages() {
 	}
 }
 
-func (client *Client) printHomeScreen(request types.Request) {
+func (client *Client) printHomeScreen(request Request) {
 	client.clearScreen()
 	client.printString("WELCOME TO GOMOKU!")
 	client.printString("Type 'mk' to make a new game")
@@ -171,8 +165,8 @@ func (client *Client) printBoardAndMessages() {
 	client.printMessages()
 }
 
-func (client *Client) sendToServer(request types.Request) {
-	data, err := helpers.GobToBytes(request)
+func (client *Client) sendToServer(request Request) {
+	data, err := GobToBytes(request)
 
 	if err != nil {
 		client.printError(err)
@@ -183,7 +177,7 @@ func (client *Client) sendToServer(request types.Request) {
 }
 
 func (client *Client) addMessage(content string, author string) {
-	message := types.Message{
+	message := Message{
 		Content: content,
 		Author:  author,
 	}
@@ -198,9 +192,9 @@ func (client *Client) CreateGame() {
 		return
 	}
 
-	request := types.Request{
+	request := Request{
 		UserID: client.userID,
-		Action: constants.CREATE,
+		Action: CREATE,
 	}
 
 	client.sendToServer(request)
@@ -218,10 +212,10 @@ func (client *Client) joinGame(gameIDStr string) {
 		return
 	}
 
-	request := types.Request{
+	request := Request{
 		GameID: gameID,
 		UserID: client.userID,
-		Action: constants.JOIN,
+		Action: JOIN,
 	}
 
 	client.sendToServer(request)
@@ -234,10 +228,10 @@ func (client *Client) makeMove(text string) {
 	} else if client.turn == 0 {
 		client.addMessage("The game hasn't started yet!", client.serverName)
 	} else {
-		request := types.Request{
+		request := Request{
 			GameID: client.GameID,
 			UserID: client.userID,
-			Action: constants.MOVE,
+			Action: MOVE,
 			Data:   text,
 		}
 
@@ -251,10 +245,10 @@ func (client *Client) sendMessage(text string) {
 	} else if client.turn == 0 {
 		client.addMessage("The game hasn't started yet!", client.serverName)
 	} else {
-		request := types.Request{
+		request := Request{
 			GameID: client.GameID,
 			UserID: client.userID,
-			Action: constants.MESSAGE,
+			Action: MESSAGE,
 			Data:   text,
 		}
 
@@ -271,7 +265,7 @@ func (client *Client) getTurnTwoInstructions() string {
 	return "If you want to play white, play a move as normal. Otherwise, type 'mv pass'."
 }
 
-func (client *Client) handleCreateRequest(request types.Request) {
+func (client *Client) handleCreateRequest(request Request) {
 	if request.Success {
 		client.gameOver = false
 		client.GameID = request.GameID
@@ -283,7 +277,7 @@ func (client *Client) handleCreateRequest(request types.Request) {
 	}
 }
 
-func (client *Client) handleJoinRequest(request types.Request) {
+func (client *Client) handleJoinRequest(request Request) {
 	if request.Success {
 		client.gameOver = false
 		client.GameID = request.GameID
@@ -300,7 +294,7 @@ func (client *Client) handleJoinRequest(request types.Request) {
 	}
 }
 
-func (client *Client) handleOtherJoinedRequest(request types.Request) {
+func (client *Client) handleOtherJoinedRequest(request Request) {
 	if request.Success {
 		client.turn = request.Turn
 		client.opponentID = request.UserID
@@ -312,7 +306,7 @@ func (client *Client) handleOtherJoinedRequest(request types.Request) {
 	}
 }
 
-func (client *Client) handleMessageRequest(request types.Request) {
+func (client *Client) handleMessageRequest(request Request) {
 	if request.Success {
 		client.addMessage(request.Data, "Opponent")
 	} else {
@@ -320,12 +314,12 @@ func (client *Client) handleMessageRequest(request types.Request) {
 	}
 }
 
-func (client *Client) handleHomeRequest(request types.Request) {
+func (client *Client) handleHomeRequest(request Request) {
 	client.reset()
 	client.printHomeScreen(request)
 }
 
-func (client *Client) handleMoveRequest(request types.Request) {
+func (client *Client) handleMoveRequest(request Request) {
 	if request.Success {
 		if client.turn == 2 {
 			client.yourColor = request.Colors[client.userID]
@@ -362,28 +356,28 @@ func (client *Client) handleMoveRequest(request types.Request) {
 
 // Handler handles requests
 func (client *Client) Handler(message []byte) {
-	request := helpers.DecodeGob(message)
+	request := DecodeGob(message)
 
 	switch action := request.Action; action {
-	case constants.CREATE:
+	case CREATE:
 		client.handleCreateRequest(request)
-	case constants.JOIN:
+	case JOIN:
 		client.handleJoinRequest(request)
-	case constants.OTHERJOINED:
+	case OTHERJOINED:
 		client.handleOtherJoinedRequest(request)
-	case constants.MESSAGE:
+	case MESSAGE:
 		client.handleMessageRequest(request)
-	case constants.HOME:
+	case HOME:
 		client.handleHomeRequest(request)
-	case constants.MOVE:
+	case MOVE:
 		client.handleMoveRequest(request)
 	}
-	go func() {client.HandledRequests <- request}()
+	go func() {client.handledRequests <- request}()
 }
 
 func (client *Client) backToHome() {
-	request := types.Request{
-		Action: constants.HOME,
+	request := Request{
+		Action: HOME,
 	}
 
 	client.sendToServer(request)
@@ -448,7 +442,7 @@ func (client *Client) ListenForInput(readstream io.Reader) {
 	}
 }
 
-func (client *Client) Connect(host string, port string) *types.SocketClient {
+func (client *Client) Connect(host string, port string) *SocketClient {
 	// create addresses
 	uuid, err := uuid.NewUUID()
 	if err != nil {
@@ -463,7 +457,7 @@ func (client *Client) Connect(host string, port string) *types.SocketClient {
 	}
 
 	client.connection = conn
-	socketClient := &types.SocketClient{Socket: client.connection}
+	socketClient := &SocketClient{Socket: client.connection}
 	return socketClient
 }
 

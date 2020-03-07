@@ -2,8 +2,6 @@ package main
 
 import (
 	"flag"
-	"go_gomoku/client"
-	"go_gomoku/server"
 	"os"
 )
 
@@ -27,10 +25,10 @@ func main() {
 	port, host, clientMode := parseEnv()
 
 	if clientMode == true {
-		client := client.New("GoGomoku")
+		client := NewClient("GoGomoku")
 		client.Run(host, port)
 	} else {
-		server := server.New()
+		server := NewServer()
 		server.Listen(port)
 	}
 }

@@ -1,10 +1,9 @@
-package helpers
+package main
 
 import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"go_gomoku/types"
 	"os"
 	"os/exec"
 	"runtime"
@@ -36,10 +35,10 @@ func ClearScreen() {
 }
 
 // DecodeGob builds a request from a gob
-func DecodeGob(message []byte) types.Request {
+func DecodeGob(message []byte) Request {
 	var network bytes.Buffer
 	network.Write(message)
-	var request types.Request
+	var request Request
 
 	dec := gob.NewDecoder(&network)
 

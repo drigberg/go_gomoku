@@ -1,25 +1,22 @@
-package client
+package main
 
 import (
-	"go_gomoku/constants"
-	"go_gomoku/helpers"
-	"go_gomoku/types"
 	"strconv"
 	"testing"
 )
 
 func TestClientHandleMessage(t *testing.T) {
-	newClient := New("GoGomoku")
-	newClient.DisablePrint = true
+	newClient := NewClient("GoGomoku")
+	newClient.disablePrint = true
 	content := "this is a message"
-	request := types.Request{
+	request := Request{
 		Success: true,
 		GameID:  3,
 		UserID:  "hello",
-		Action:  constants.MESSAGE,
+		Action:  MESSAGE,
 		Data:    content,
 	}
-	message, err := helpers.GobToBytes(request)
+	message, err := GobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
@@ -43,8 +40,8 @@ func TestClientHandleMessage(t *testing.T) {
 }
 
 func TestClientHandleMessageMultiple(t *testing.T) {
-	newClient := New("GoGomoku")
-	newClient.DisablePrint = true
+	newClient := NewClient("GoGomoku")
+	newClient.disablePrint = true
 	messages := []string{
 		"this is a message",
 		"this is another message",
@@ -56,14 +53,14 @@ func TestClientHandleMessageMultiple(t *testing.T) {
 	}
 
 	for _, message := range messages {
-		request := types.Request{
+		request := Request{
 			Success: true,
 			GameID:  3,
 			UserID:  "hello",
-			Action:  constants.MESSAGE,
+			Action:  MESSAGE,
 			Data:    message,
 		}
-		messageBytes, err := helpers.GobToBytes(request)
+		messageBytes, err := GobToBytes(request)
 		if err != nil {
 			t.Errorf("Got error while encoding gob: %s", err)
 		}
@@ -87,15 +84,15 @@ func TestClientHandleMessageMultiple(t *testing.T) {
 
 func TestClientHandleCreateSuccess(t *testing.T) {
 	serverName := "GoGomoku"
-	newClient := New(serverName)
-	newClient.DisablePrint = true
+	newClient := NewClient(serverName)
+	newClient.disablePrint = true
 	gameID := 3
-	request := types.Request{
+	request := Request{
 		Success: true,
 		GameID:  gameID,
-		Action:  constants.CREATE,
+		Action:  CREATE,
 	}
-	requestBytes, err := helpers.GobToBytes(request)
+	requestBytes, err := GobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
@@ -129,13 +126,13 @@ func TestClientHandleCreateSuccess(t *testing.T) {
 
 func TestClientHandleCreateError(t *testing.T) {
 	serverName := "GoGomoku"
-	newClient := New(serverName)
-	newClient.DisablePrint = true
-	request := types.Request{
+	newClient := NewClient(serverName)
+	newClient.disablePrint = true
+	request := Request{
 		Success: false,
-		Action:  constants.CREATE,
+		Action:  CREATE,
 	}
-	requestBytes, err := helpers.GobToBytes(request)
+	requestBytes, err := GobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
