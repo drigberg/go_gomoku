@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func waitForHandledRequest(newClient *client.Client, action string) (types.Reque
 	case r := <-done:
 		request = r
 	case <-time.After(1 * time.Second):
-		err = errors.New("Unable to connect and create game")
+		err = errors.New("Timeout error: request not received")
 	}
 	return request, err
 }
@@ -66,6 +67,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 		t.Error("Could not connect")
 	}
 
+	// verify sent home
 	request, err := waitForHandledRequest(&newClient, constants.HOME)
 	if err != nil {
 		t.Fatal(err)
@@ -75,32 +77,68 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 	}
 }
 
+
+type Player struct {
+	client 			*client.Client
+	socketClient 	*types.SocketClient
+	reader 			*incrementalReader
+}
+
+func setupClient(t *testing.T) (Player, error) {
+	var err error
+	newClient := client.New("Test")
+	newClient.DisablePrint = true
+	newSocketClient := newClient.Connect("localhost", "3003")
+	connected := make(chan bool)
+	reader := incrementalReader{make(chan string)}
+
+	go newSocketClient.Receive(newClient.Handler, &connected)
+	select {
+	case <-connected:
+	case <-time.After(1 * time.Second):
+		err = errors.New("Could not connect")
+	}
+
+	go func() {
+		newClient.ListenForInput(reader)
+	}()
+
+	player := Player{
+		&newClient,
+		newSocketClient,
+		&reader,
+	}
+
+	if err == nil {
+		// verify sent home
+		_, homeError := waitForHandledRequest(&newClient, constants.HOME)
+		if homeError != nil {
+			err = homeError
+		}
+	}
+
+	return player, err
+}
+
 func TestGoGomokuCreateGameSuccess(t *testing.T) {
 	newServer := server.New()
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
-	newClient := client.New("Test")
-	newClient.DisablePrint = true
-	socketClient := newClient.Connect("localhost", "3003")
-	defer socketClient.Socket.Close()
-
-	connected := make(chan bool)
-	go socketClient.Receive(newClient.Handler, &connected)
-	select {
-	case <-connected:
-	case <-time.After(1 * time.Second):
-		t.Error("Could not connect")
+	player1Bundle, err := setupClient(t)
+	defer player1Bundle.socketClient.Socket.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
-	waitForHandledRequest(&newClient, constants.HOME)
 
-	reader := incrementalReader{make(chan string)}
-	go func() {newClient.ListenForInput(reader)}()
-
-	reader.input <- "mk\n"
-	waitForHandledRequest(&newClient, constants.CREATE)
+	// create game
+	player1Bundle.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	if err != nil {
+		t.Fatal(err)
+	}
 	
-	if newClient.GameID == -1 {
+	if player1Bundle.client.GameID == -1 {
 		t.Errorf("Client still has gameID -1")
 	}
 }
@@ -110,34 +148,194 @@ func TestGoGomokuHomeFromGameSuccess(t *testing.T) {
 	go newServer.Listen("3003")
 	defer newServer.Stop()
 
-	newClient := client.New("Test")
-	newClient.DisablePrint = true
-	socketClient := newClient.Connect("localhost", "3003")
-	defer socketClient.Socket.Close()
-
-	connected := make(chan bool)
-	go socketClient.Receive(newClient.Handler, &connected)
-	select {
-	case <-connected:
-	case <-time.After(1 * time.Second):
-		t.Error("Could not connect")
+	player1Bundle, err := setupClient(t)
+	defer player1Bundle.socketClient.Socket.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	waitForHandledRequest(&newClient, constants.HOME)
+	// create game
+	player1Bundle.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	reader := incrementalReader{make(chan string)}
-	go func() {newClient.ListenForInput(reader)}()
-
-	reader.input <- "mk\n"
-	waitForHandledRequest(&newClient, constants.CREATE)
-
-	reader.input <- "hm\n"
-	reader.input <- "y\n"
-	request, err := waitForHandledRequest(&newClient, constants.HOME)
+	player1Bundle.reader.input <- "hm\n"
+	player1Bundle.reader.input <- "y\n"
+	request, err := waitForHandledRequest(player1Bundle.client, constants.HOME)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(request.Home) != 1 {
 		t.Errorf("Expected there to be 1 active game, found %d", len(request.Home))
 	}	
+}
+
+
+func TestGoGomokuHomeFromGameUnconfirmed(t *testing.T) {
+	newServer := server.New()
+	go newServer.Listen("3003")
+	defer newServer.Stop()
+
+	player1Bundle, err := setupClient(t)
+	defer player1Bundle.socketClient.Socket.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create game
+	player1Bundle.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// go home but do not confirm
+	player1Bundle.reader.input <- "hm\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	if err == nil {
+		t.Error("Expected to not be sent home")
+	}
+}
+
+func TestGoGomokuHomeFromGameRefused(t *testing.T) {
+	newServer := server.New()
+	go newServer.Listen("3003")
+	defer newServer.Stop()
+
+	player1Bundle, err := setupClient(t)
+	defer player1Bundle.socketClient.Socket.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create game
+	player1Bundle.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// go home but type n for confirmation
+	player1Bundle.reader.input <- "hm\n"
+	player1Bundle.reader.input <- "n\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	if err == nil {
+		t.Error("Expected to not be sent home")
+	}
+}
+
+func TestGoGomokuHomeRefresh(t *testing.T) {
+	newServer := server.New()
+	go newServer.Listen("3003")
+	defer newServer.Stop()
+
+	player1Bundle, err := setupClient(t)
+	defer player1Bundle.socketClient.Socket.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create game
+	player1Bundle.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1Bundle.client, constants.CREATE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// return home
+	player1Bundle.reader.input <- "hm\n"
+	player1Bundle.reader.input <- "y\n"
+	request, err := waitForHandledRequest(player1Bundle.client, constants.HOME)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(request.Home) != 1 {
+		t.Errorf("Expected there to be 1 active game, found %d", len(request.Home))
+	}
+
+	// refresh home
+	player1Bundle.reader.input <- "hm\n"
+	request, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	if err != nil {
+		t.Error(err)
+	}
+	if request.Action != constants.HOME {
+		t.Errorf("Expected response action to be HOME, got %s", request.Action)
+	}
+	if len(request.Home) != 1 {
+		t.Errorf("Expected there to be 1 active game, found %d", len(request.Home))
+	}
+
+	// refresh home
+	player1Bundle.reader.input <- "hm\n"
+	request, err = waitForHandledRequest(player1Bundle.client, constants.HOME)
+	if err != nil {
+		t.Error(err)
+	}
+	if request.Action != constants.HOME {
+		t.Errorf("Expected response action to be HOME, got %s", request.Action)
+	}
+	if len(request.Home) != 1 {
+		t.Errorf("Expected there to be 1 active game, found %d", len(request.Home))
+	}
+}
+
+func setupGame(t *testing.T) (Player, Player, error) {
+	// create player 1
+	player1, err := setupClient(t)
+	if err != nil {
+		return player1, Player{}, err
+	}
+
+	// create player 2
+	player2, err := setupClient(t)
+	if err != nil {
+		return player1, player2, err
+	}
+	
+	// create game
+	player1.reader.input <- "mk\n"
+	_, err = waitForHandledRequest(player1.client, constants.CREATE)
+	if err != nil {
+		return player1, player2, err
+	}
+	
+	if player1.client.GameID == -1 {
+		return player1, player2, errors.New("Client still has gameID -1")
+	}
+
+
+	// join game
+	player2.reader.input <- "jn " + strconv.Itoa(player1.client.GameID) + "\n"
+	_, err = waitForHandledRequest(player2.client, constants.JOIN)
+	if err != nil {
+		return player1, player2, err
+	}
+
+	_, err = waitForHandledRequest(player1.client, constants.OTHERJOINED)
+	if err != nil {
+		return player1, player2, err
+	}
+
+	if player2.client.GameID != player1.client.GameID {
+		return player1, player2, errors.New("Players are not in same game")
+	}
+
+	return player1, player2, nil
+}
+
+func TestGoGomokuJoinGameSuccess(t *testing.T) {
+	newServer := server.New()
+	go newServer.Listen("3003")
+	defer newServer.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
 }
