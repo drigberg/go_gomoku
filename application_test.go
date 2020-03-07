@@ -436,6 +436,9 @@ func TestGoGomokuFirstMoveSuccess(t *testing.T) {
 			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
 		}
 	}
+	if game.IsOver {
+		t.Fatal("Expected game to not be over")
+	}
 }
 
 func TestGoGomokuSecondMovePass(t *testing.T) {
@@ -490,6 +493,9 @@ func TestGoGomokuSecondMovePass(t *testing.T) {
 		if space != expectedBlackSpaces[i] {
 			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
 		}
+	}
+	if game.IsOver {
+		t.Fatal("Expected game to not be over")
 	}
 }
 
@@ -547,6 +553,9 @@ func TestGoGomokuSecondMoveSuccess(t *testing.T) {
 			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
 		}
 	}
+	if game.IsOver {
+		t.Fatal("Expected game to not be over")
+	}
 }
 
 func TestGoGomokuFurtherMoveSuccessAfterPass(t *testing.T) {
@@ -597,5 +606,154 @@ func TestGoGomokuFurtherMoveSuccessAfterPass(t *testing.T) {
 		if space != expectedBlackSpaces[i] {
 			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
 		}
+	}
+	if game.IsOver {
+		t.Fatal("Expected game to not be over")
+	}
+}
+
+func TestGoGomokuBlackWin(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+	game := server.games[player1.client.GameID]
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 8 1\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 2\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 3\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 3\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 4\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 4\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 5\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"8 1", "8 2", "8 3", "8 4"}
+	expectedBlackSpaces := []string{"1 1", "1 2", "1 3", "1 4", "1 5"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
+	}
+
+	if !game.IsOver {
+		t.Fatal("Expected game to be over")
+	}
+}
+
+
+func TestGoGomokuWhiteWin(t *testing.T) {
+	server := NewServer()
+	go server.Listen("3003")
+	defer server.Stop()
+
+	player1, player2, err := setupGame(t)
+	defer player1.socketClient.Socket.Close()
+	defer player2.socketClient.Socket.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+	game := server.games[player1.client.GameID]
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 8 1\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 2\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 3\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 3\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 4\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 4\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 6\n", player1, player2, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = playMoveAndValidateBoardStates(game, "mv 8 5\n", player2, player1, true)
+	if err != nil {
+		t.Error(err)
+	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"8 1", "8 2", "8 3", "8 4", "8 5"}
+	expectedBlackSpaces := []string{"1 1", "1 2", "1 3", "1 4", "1 6"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
+	}
+
+	if !game.IsOver {
+		t.Fatal("Expected game to be over")
 	}
 }
