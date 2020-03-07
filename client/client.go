@@ -19,7 +19,9 @@ import (
 
 // Client runs the CLI for players
 type Client struct {
+	// DisablePrint ensures that screen isn't cleared, etc during tests
 	DisablePrint  	bool
+	// HandledRequests allows us to await request handling in tests
 	HandledRequests chan types.Request
 	messages      	[]types.Message
 	serverName    	string
