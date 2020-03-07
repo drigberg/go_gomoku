@@ -63,13 +63,12 @@ func IsTurn(game *GameRoom, userID string) bool {
 
 // Server handles all requests and game states
 type Server struct {
-	M      			sync.Mutex
-	DisablePrint	bool
-	games  			map[int]*GameRoom
-	gameID 			int
-	quit 			chan interface{}
-	listener 		net.Listener
-	wg 				sync.WaitGroup
+	M      		sync.Mutex
+	games  		map[int]*GameRoom
+	gameID 		int
+	quit 		chan interface{}
+	listener 	net.Listener
+	wg 			sync.WaitGroup
 }
 
 // New creates a server instances
@@ -78,18 +77,6 @@ func New() Server {
 		games:  make(map[int]*GameRoom),
 		gameID: 0,
 		quit: make(chan interface {}),
-	}
-}
-
-func (server *Server) printString(message string) {
-	if !server.DisablePrint {
-		log.Println(message)
-	}
-}
-
-func (server *Server) printError(err error) {
-	if !server.DisablePrint {
-		log.Println(err)
 	}
 }
 
@@ -171,11 +158,9 @@ type SocketClientResponse struct {
 }
 
 // SendBackoff tries to send and keeps trying
-func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int, disablePrint bool) {
+func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int) {
 	if i > 1 {
-		if !disablePrint {
-			log.Println("Retrying message send! Attempt:", i)
-		}
+		log.Println("Retrying message send! Attempt:", i)
 	}
 	if socketClientResponse.socketClient.Closed {
 		return
@@ -190,22 +175,20 @@ func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int
 		if i > 5 {
 			return
 		}
-		socketClientResponse.sendBackoff(data, i+1, disablePrint)
+		socketClientResponse.sendBackoff(data, i+1)
 	}
 }
 
 // SendToClient tries to send a request to socketClient, with backoff
-func (socketClientResponse *SocketClientResponse) send(disablePrint bool) {
+func (socketClientResponse *SocketClientResponse) send() {
 	data, err := helpers.GobToBytes(socketClientResponse.response)
 
 	if err != nil {
-		if !disablePrint {
-			log.Println(err)
-		}
+		log.Println(err)
 		return
 	}
 
-	socketClientResponse.sendBackoff(data, 1, disablePrint)
+	socketClientResponse.sendBackoff(data, 1)
 }
 
 func (server *Server) handleCreate(req types.Request, socketClient *types.SocketClient) []SocketClientResponse {
@@ -501,7 +484,7 @@ func (server *Server) handleMove(req types.Request, socketClient *types.SocketCl
 
 // HandleRequest handles a request
 func (server *Server) HandleRequest(req types.Request, socketClient *types.SocketClient) {
-	server.printString("Request received [userID "+req.UserID+", action "+req.Action+"]")
+	log.Println("Request:", socketClient, req)
 
 	activeGame := server.games[req.GameID]
 	if activeGame != nil {
@@ -522,11 +505,11 @@ func (server *Server) HandleRequest(req types.Request, socketClient *types.Socke
 	case constants.HOME:
 		socketClientResponses = server.handleSendToHome(socketClient)
 	default:
-		server.printString("Unrecognized action: "+req.Action)
+		log.Println("Unrecognized action:", req.Action)
 	}
 
 	for _, socketClientResponse := range socketClientResponses {
-		socketClientResponse.send(server.DisablePrint)
+		socketClientResponse.send()
 	}
 }
 
@@ -570,7 +553,7 @@ func (server *Server) Stop() {
 
 // Listen starts the server
 func (server *Server) Listen(port string) {
-	server.printString("Starting server...")
+	log.Println("Starting server...")
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatal(err)
@@ -581,7 +564,6 @@ func (server *Server) Listen(port string) {
 	
 	// create socket socketClient manager
 	socketClientManager := SocketClientManager{
-		server: 	server,
 		clients:    make(map[*types.SocketClient]bool),
 		register:   make(chan *types.SocketClient),
 		unregister: make(chan *types.SocketClient),
@@ -589,7 +571,7 @@ func (server *Server) Listen(port string) {
 
 	go socketClientManager.start()
 
-	server.printString("Server listening on port " + port + "!")
+	log.Println("Server listening on port " + port + "!")
 
 	for {
 		connection, err := listener.Accept()
@@ -598,7 +580,7 @@ func (server *Server) Listen(port string) {
 			case <-server.quit:
 			  return
 			default:
-			  server.printError(err)
+			  log.Println("Accept error:", err)
 			}
 		} else {
 			server.wg.Add(1)
@@ -612,7 +594,7 @@ func (server *Server) Listen(port string) {
 	
 			socketClientResponses := server.handleSendToHome(socketClient)
 			for _, socketClientResponse := range socketClientResponses {
-				go socketClientResponse.send(server.DisablePrint)
+				go socketClientResponse.send()
 			}
 		}
 	}
@@ -620,7 +602,6 @@ func (server *Server) Listen(port string) {
 
 // SocketClientManager handles all clients
 type SocketClientManager struct {
-	server	   *Server
 	clients    map[*types.SocketClient]bool
 	register   chan *types.SocketClient
 	unregister chan *types.SocketClient
@@ -669,15 +650,15 @@ func (manager *SocketClientManager) send(socketClient *types.SocketClient) {
 }
 
 func (manager *SocketClientManager) start() {
-	manager.server.printString("SocketClient manager listening for clients joining/leaving...")
+	log.Println("SocketClient manager listening for clients joining/leaving...")
 	for {
 		select {
 		case socketClient := <-manager.register:
 			manager.clients[socketClient] = true
-			manager.server.printString("Added new socketClient!")
+			log.Println("Added new socketClient!")
 		case socketClient := <-manager.unregister:
 			if _, ok := manager.clients[socketClient]; ok {
-				manager.server.printString("A socketClient has left!")
+				log.Println("A socketClient has left!")
 				close(socketClient.Data)
 				delete(manager.clients, socketClient)
 			}
