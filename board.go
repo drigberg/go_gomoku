@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -65,6 +66,15 @@ func NewBoard() Board {
 	return Board{
 		Spaces: spaces,
 	}
+}
+
+func (board *Board) listSpaces(color string) []string {
+	spaces := []string{}
+	for space, _ := range board.Spaces[color] {
+		spaces = append(spaces, space)
+	}
+	sort.Strings(spaces)
+	return spaces
 }
 
 func (board *Board) printBoard() {

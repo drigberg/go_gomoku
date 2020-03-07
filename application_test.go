@@ -350,7 +350,24 @@ func TestGoGomokuJoinGameSuccess(t *testing.T) {
 	}
 }
 
-func playMove(move string, movingPlayer PlayerBundle, waitingPlayer PlayerBundle) error {
+func boardsAreEqual(game *GameRoom, player1 PlayerBundle, player2 PlayerBundle) bool {
+	for _, color := range []string{"white","black"} {
+		boardSpaces := game.Board.listSpaces(color)
+		player1Spaces := player1.client.board.listSpaces(color)
+		player2Spaces := player2.client.board.listSpaces(color)
+		for i, space := range(boardSpaces) {
+			if player1Spaces[i] != space {
+				return false
+			}
+			if player2Spaces[i] != space {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func playMoveAndValidateBoardStates(game *GameRoom, move string, movingPlayer PlayerBundle, waitingPlayer PlayerBundle, moveIsValid bool) error {
 	movingPlayer.reader.input <- move
 	_, err := waitForHandledRequest(movingPlayer.client, MOVE)
 	if err != nil {
@@ -361,13 +378,28 @@ func playMove(move string, movingPlayer PlayerBundle, waitingPlayer PlayerBundle
 		return err
 	}
 
-	if movingPlayer.client.yourTurn {
-		return errors.New("Should not be moving player's turn anymore")
+	if moveIsValid {
+		if movingPlayer.client.yourTurn {
+			return errors.New("Should not be moving player's turn anymore")
+		}
+	
+		if !waitingPlayer.client.yourTurn {
+			return errors.New("Should be waiting player's turn now")
+		}
+	} else {
+		if !movingPlayer.client.yourTurn {
+			return errors.New("Should still be moving player's turn (move was invalid)")
+		}
+	
+		if waitingPlayer.client.yourTurn {
+			return errors.New("Should not be waiting player's turn (move was invalid)")
+		}
 	}
 
-	if !waitingPlayer.client.yourTurn {
-		return errors.New("Should be waiting player's turn now")
+	if !boardsAreEqual(game, movingPlayer, waitingPlayer) {
+		return errors.New("After move, boards are not equal")
 	}
+
 	return nil
 }
 
@@ -383,10 +415,26 @@ func TestGoGomokuFirstMoveSuccess(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	game := server.games[player1.client.GameID]
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 1 3\n", player1, player2, true)
 	if err != nil {
 		t.Error(err)
+	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"1 3"}
+	expectedBlackSpaces := []string{"1 1", "1 2"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
 	}
 }
 
@@ -403,12 +451,13 @@ func TestGoGomokuSecondMovePass(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	game := server.games[player1.client.GameID]
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 1 3\n", player1, player2, true)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = playMove("mv pass\n", player2, player1)
+	err = playMoveAndValidateBoardStates(game, "mv pass\n", player2, player1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -426,6 +475,22 @@ func TestGoGomokuSecondMovePass(t *testing.T) {
 	if player2.client.opponentColor != "white" {
 		t.Errorf("Expected player 2's opponentColor to be white, got %s", player2.client.opponentColor)
 	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"1 3"}
+	expectedBlackSpaces := []string{"1 1", "1 2"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
+	}
 }
 
 func TestGoGomokuSecondMoveSuccess(t *testing.T) {
@@ -441,12 +506,14 @@ func TestGoGomokuSecondMoveSuccess(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	game := server.games[player1.client.GameID]
+
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 1 3\n", player1, player2, true)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = playMove("mv 1 4\n", player2, player1)
+	err = playMoveAndValidateBoardStates(game, "mv 1 4\n", player2, player1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -464,6 +531,22 @@ func TestGoGomokuSecondMoveSuccess(t *testing.T) {
 	if player2.client.opponentColor != "black" {
 		t.Errorf("Expected player 2's opponentColor to be black, got %s", player2.client.opponentColor)
 	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"1 3", "1 4"}
+	expectedBlackSpaces := []string{"1 1", "1 2"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
+	}
 }
 
 func TestGoGomokuFurtherMoveSuccessAfterPass(t *testing.T) {
@@ -478,24 +561,41 @@ func TestGoGomokuFurtherMoveSuccessAfterPass(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	game := server.games[player1.client.GameID]
 
-	err = playMove("mv 1 1, 1 2, 1 3\n", player1, player2)
+	err = playMoveAndValidateBoardStates(game, "mv 1 1, 1 2, 1 3\n", player1, player2, true)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = playMove("mv pass\n", player2, player1)
+	err = playMoveAndValidateBoardStates(game, "mv pass\n", player2, player1, true)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = playMove("mv 1 4\n", player1, player2)
+	err = playMoveAndValidateBoardStates(game, "mv 1 4\n", player1, player2, true)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = playMove("mv 1 5\n", player2, player1)
+	err = playMoveAndValidateBoardStates(game, "mv 1 5\n", player2, player1, true)
 	if err != nil {
 		t.Error(err)
+	}
+
+	boardSpacesWhite := game.Board.listSpaces("white")
+	boardSpacesBlack := game.Board.listSpaces("black")
+	expectedWhiteSpaces := []string{"1 3", "1 4"}
+	expectedBlackSpaces := []string{"1 1", "1 2", "1 5"}
+	for i, space := range boardSpacesWhite {
+		if space != expectedWhiteSpaces[i] {
+			t.Fatalf("Board state does not match expected for white. Got: %s, expected: %s", boardSpacesWhite, expectedWhiteSpaces)
+		}
+	}
+
+	for i, space := range boardSpacesBlack {
+		if space != expectedBlackSpaces[i] {
+			t.Fatalf("Board state does not match expected for black. Got: %s, expected: %s", boardSpacesBlack, expectedBlackSpaces)
+		}
 	}
 }
