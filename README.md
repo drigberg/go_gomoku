@@ -6,7 +6,7 @@ Gomoku is a game of Japanese origin, played on a Go board with black and white p
 This game implements the Swap variation. First, Player 1 places two black stones and one white. Then,  Player 2 can choose to either play a white stone or pass the turn and play as black instead. This helps to eliminate the advantage inherent in playing first!
 
 # BUILD
-Just run `go build .` to build to the app!
+Just run `go build .` to build the app!
 
 # CONNECT
 Run `./go_gomoku -play` to start the client! The environment variables `HOST` and `PORT` can be used to connect to a specific server. By default, the client will try to connect to `http://localhost:5000` for debugging.
