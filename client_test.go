@@ -16,7 +16,7 @@ func TestClientHandleMessage(t *testing.T) {
 		Action:  MESSAGE,
 		Data:    content,
 	}
-	message, err := GobToBytes(request)
+	message, err := gobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
@@ -24,7 +24,7 @@ func TestClientHandleMessage(t *testing.T) {
 		t.Errorf("Expected no messages, found %d: %s", len(newClient.messages), newClient.messages)
 	}
 
-	newClient.Handler(message)
+	newClient.handler(message)
 
 	if len(newClient.messages) != 1 {
 		t.Errorf("Expected 1 message, found %d: %s", len(newClient.messages), newClient.messages)
@@ -60,11 +60,11 @@ func TestClientHandleMessageMultiple(t *testing.T) {
 			Action:  MESSAGE,
 			Data:    message,
 		}
-		messageBytes, err := GobToBytes(request)
+		messageBytes, err := gobToBytes(request)
 		if err != nil {
 			t.Errorf("Got error while encoding gob: %s", err)
 		}
-		newClient.Handler(messageBytes)
+		newClient.handler(messageBytes)
 	}
 
 	if len(newClient.messages) != len(messages) {
@@ -92,11 +92,11 @@ func TestClientHandleCreateSuccess(t *testing.T) {
 		GameID:  gameID,
 		Action:  CREATE,
 	}
-	requestBytes, err := GobToBytes(request)
+	requestBytes, err := gobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
-	newClient.Handler(requestBytes)
+	newClient.handler(requestBytes)
 	if newClient.gameOver {
 		t.Error("Expected gameOver to be false")
 	}
@@ -132,11 +132,11 @@ func TestClientHandleCreateError(t *testing.T) {
 		Success: false,
 		Action:  CREATE,
 	}
-	requestBytes, err := GobToBytes(request)
+	requestBytes, err := gobToBytes(request)
 	if err != nil {
 		t.Errorf("Got error while encoding gob: %s", err)
 	}
-	newClient.Handler(requestBytes)
+	newClient.handler(requestBytes)
 
 	if len(newClient.messages) != 1 {
 		t.Errorf("Expected 1 message, found %d: %s", len(newClient.messages), newClient.messages)

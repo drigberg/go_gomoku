@@ -41,9 +41,9 @@ type Board struct {
 
 // BoardInterface defines methods a Board should implement
 type BoardInterface interface {
-	CheckForWin(Coord, string) bool
-	CheckOwnership(int, string, Coord) (bool, Request)
-	PrintBoard()
+	checkForWin(Coord, string) bool
+	checkOwnership(int, string, Coord) (bool, Request)
+	printBoard()
 	checkAlongAxis(string, [2]int, Coord, int) int
 	getAxisLabel(int, int) string
 	getColorCode(string) string
@@ -67,8 +67,7 @@ func NewBoard() Board {
 	}
 }
 
-// PrintBoard prints the board
-func (board *Board) PrintBoard() {
+func (board *Board) printBoard() {
 	prevOccupied := FREE
 	occupied := FREE
 
@@ -117,8 +116,7 @@ func (board *Board) checkAlongAxis(color string, axis [2]int, move Coord, num in
 	return num
 }
 
-// CheckForWin looks for five in a row from a position
-func (board *Board) CheckForWin(move Coord, color string) bool {
+func (board *Board) checkForWin(move Coord, color string) bool {
 	// check within color from move coordinates
 	for _, axis := range axes {
 		len := board.checkAlongAxis(color, axis, move, 1)
@@ -165,8 +163,7 @@ func (board *Board) intersectionOrSpace(horizontal string, intersection string, 
 	return horizontal + space
 }
 
-// CheckOwnership checks if a move can be placed
-func (board *Board) CheckOwnership(gameID int, userID string, move Coord) (bool, Request) {
+func (board *Board) checkOwnership(gameID int, userID string, move Coord) (bool, Request) {
 	if board.isTakenBy(move) != FREE {
 		errorResponse := Request{
 			GameID:  gameID,

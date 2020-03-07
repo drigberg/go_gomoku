@@ -21,8 +21,7 @@ func clearLinuxOrDarwin() {
 	cmd.Run()
 }
 
-// ClearScreen clears the screen, based on operating system
-func ClearScreen() {
+func clearScreen() {
 	switch runtime.GOOS {
 	case "linux":
 	case "darwin":
@@ -34,8 +33,7 @@ func ClearScreen() {
 	}
 }
 
-// DecodeGob builds a request from a gob
-func DecodeGob(message []byte) Request {
+func decodeGob(message []byte) Request {
 	var network bytes.Buffer
 	network.Write(message)
 	var request Request
@@ -51,8 +49,7 @@ func DecodeGob(message []byte) Request {
 	return request
 }
 
-// GobToBytes converts a gob to bytes
-func GobToBytes(key interface{}) ([]byte, error) {
+func gobToBytes(key interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(key)

@@ -97,7 +97,7 @@ func TestServerParseCoordsValid(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, move, errorResponse := newServer.ParseMove(req, testcase.input)
+		is_valid, move, errorResponse := newServer.parseMove(req, testcase.input)
 		if !is_valid {
 			t.Errorf("Expected move to be valid")
 		}
@@ -140,7 +140,7 @@ func TestServerParseCoordsInvalidTaken(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.ParseMove(req, testcase.input)
+		is_valid, _, errorResponse := newServer.parseMove(req, testcase.input)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
@@ -180,7 +180,7 @@ func TestServerParseCoordsInvalidOffBoard(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.ParseMove(req, testcase)
+		is_valid, _, errorResponse := newServer.parseMove(req, testcase)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}
@@ -220,7 +220,7 @@ func TestServerParseCoordsInvalidSyntax(t *testing.T) {
 			GameID:  gameID,
 			UserID:  player1.UserID,
 		}
-		is_valid, _, errorResponse := newServer.ParseMove(req, testcase)
+		is_valid, _, errorResponse := newServer.parseMove(req, testcase)
 		if is_valid {
 			t.Errorf("Expected move to not be valid")
 		}

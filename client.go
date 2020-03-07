@@ -34,9 +34,9 @@ type Client struct {
 // Interface defines methods a Client should implement
 type ClientInterface interface {
 	Run(string, string)
-	Handler([]byte)
-	CreateGame()
-	ListenForInput(io.Reader)
+	handler([]byte)
+	createGame()
+	listenForInput(io.Reader)
 	addMessage(string, string)
 	backToHome()
 	clearScreen()
@@ -87,13 +87,13 @@ func (client *Client) reset() {
 
 func (client *Client) clearScreen() {
 	if !client.disablePrint {
-		ClearScreen()
+		clearScreen()
 	}
 }
 
 func (client *Client) printBoard() {
 	if !client.disablePrint {
-		client.board.PrintBoard()
+		client.board.printBoard()
 	}
 }
 
@@ -166,7 +166,7 @@ func (client *Client) printBoardAndMessages() {
 }
 
 func (client *Client) sendToServer(request Request) {
-	data, err := GobToBytes(request)
+	data, err := gobToBytes(request)
 
 	if err != nil {
 		client.printError(err)
@@ -186,7 +186,7 @@ func (client *Client) addMessage(content string, author string) {
 	client.printBoardAndMessages()
 }
 
-func (client *Client) CreateGame() {
+func (client *Client) createGame() {
 	if client.GameID != -1 {
 		client.printString("You're already in a game!")
 		return
@@ -354,9 +354,9 @@ func (client *Client) handleMoveRequest(request Request) {
 	}
 }
 
-// Handler handles requests
-func (client *Client) Handler(message []byte) {
-	request := DecodeGob(message)
+// handler handles requests
+func (client *Client) handler(message []byte) {
+	request := decodeGob(message)
 
 	switch action := request.Action; action {
 	case CREATE:
@@ -383,7 +383,7 @@ func (client *Client) backToHome() {
 	client.sendToServer(request)
 }
 
-func (client *Client) ListenForInput(readstream io.Reader) {
+func (client *Client) listenForInput(readstream io.Reader) {
 	goingHome := false
 	scanner := bufio.NewScanner(readstream)
 	for scanner.Scan() {
@@ -406,7 +406,7 @@ func (client *Client) ListenForInput(readstream io.Reader) {
 		case "hp":
 			client.addMessage("Type mk to make a game; jn <game_id> to join a game; mv <x> <y> to make a move; mg <message> to send a message; hp for help", client.serverName)
 		case "mk":
-			client.CreateGame()
+			client.createGame()
 		case "jn":
 			if len(text) < 4 {
 				client.addMessage("Invalid value! Type 'hp' for help!", client.serverName)
@@ -466,7 +466,7 @@ func (client *Client) Run(host string, port string) {
 	socketClient := client.Connect(host, port)
 	connected := make(chan bool)
 
-	go socketClient.Receive(client.Handler, &connected)
+	go socketClient.Receive(client.handler, &connected)
 
 	select {
 	case <-connected:
@@ -475,5 +475,5 @@ func (client *Client) Run(host string, port string) {
 		os.Exit(1)
 	}
 
-	client.ListenForInput(os.Stdin)
+	client.listenForInput(os.Stdin)
 }

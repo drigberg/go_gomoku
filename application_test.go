@@ -55,7 +55,7 @@ func TestGoGomokuConnectSuccess(t *testing.T) {
 	defer socketClient.Socket.Close()
 
 	connected := make(chan bool)
-	go socketClient.Receive(newClient.Handler, &connected)
+	go socketClient.Receive(newClient.handler, &connected)
 	select {
 	case <-connected:
 	case <-time.After(1 * time.Second):
@@ -87,7 +87,7 @@ func setupClient(t *testing.T) (PlayerBundle, error) {
 	connected := make(chan bool)
 	reader := incrementalReader{make(chan string)}
 
-	go newSocketClient.Receive(newClient.Handler, &connected)
+	go newSocketClient.Receive(newClient.handler, &connected)
 	select {
 	case <-connected:
 	case <-time.After(1 * time.Second):
@@ -95,7 +95,7 @@ func setupClient(t *testing.T) (PlayerBundle, error) {
 	}
 
 	go func() {
-		newClient.ListenForInput(reader)
+		newClient.listenForInput(reader)
 	}()
 
 	player := PlayerBundle{

@@ -29,10 +29,10 @@ func getWinningCoordsSlices(gameBoard *Board) (*[]Coord, *[]Coord) {
 	for x := 0; x < 15; x++ {
 		for y := 0; y < 15; y++ {
 			coord := Coord{X: x, Y: y}
-			if (*gameBoard).CheckForWin(coord, "white") {
+			if (*gameBoard).checkForWin(coord, "white") {
 				winningCoordsWhite = append(winningCoordsWhite, coord)
 			}
-			if (*gameBoard).CheckForWin(coord, "black") {
+			if (*gameBoard).checkForWin(coord, "black") {
 				winningCoordsBlack = append(winningCoordsBlack, coord)
 			}
 		}
@@ -62,7 +62,7 @@ func TestBoardNew(t *testing.T) {
 	}
 }
 
-func TestBoardCheckForWinEmpty(t *testing.T) {
+func TestBoardcheckForWinEmpty(t *testing.T) {
 	gameBoard := NewBoard()
 	winningCoordsWhite, winningCoordsBlack := getWinningCoordsSlices(&gameBoard)
 	if len(*winningCoordsWhite) > 0 {
@@ -73,15 +73,15 @@ func TestBoardCheckForWinEmpty(t *testing.T) {
 	}
 }
 
-type BoardCheckForWinSuccessTestCase struct {
+type BoardcheckForWinSuccessTestCase struct {
 	label                 string
 	coordStrings          []string
 	expectedWinningCoords []Coord
 }
 
-func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
-	testcases := []BoardCheckForWinSuccessTestCase{
-		BoardCheckForWinSuccessTestCase{
+func getcheckForWinTestcases() []BoardcheckForWinSuccessTestCase {
+	testcases := []BoardcheckForWinSuccessTestCase{
+		BoardcheckForWinSuccessTestCase{
 			"horizontal",
 			[]string{"3 3", "4 3", "5 3", "6 3", "7 3"},
 			[]Coord{
@@ -92,7 +92,7 @@ func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 				Coord{X: 7, Y: 3},
 			},
 		},
-		BoardCheckForWinSuccessTestCase{
+		BoardcheckForWinSuccessTestCase{
 			"diagonal_right",
 			[]string{"3 3", "4 4", "5 5", "6 6", "7 7"},
 			[]Coord{
@@ -103,7 +103,7 @@ func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 				Coord{X: 7, Y: 7},
 			},
 		},
-		BoardCheckForWinSuccessTestCase{
+		BoardcheckForWinSuccessTestCase{
 			"vertical",
 			[]string{"3 3", "3 4", "3 5", "3 6", "3 7"},
 			[]Coord{
@@ -114,7 +114,7 @@ func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 				Coord{X: 3, Y: 7},
 			},
 		},
-		BoardCheckForWinSuccessTestCase{
+		BoardcheckForWinSuccessTestCase{
 			"diagonal_left",
 			[]string{"7 3", "6 4", "5 5", "4 6", "3 7"},
 			[]Coord{
@@ -129,8 +129,8 @@ func getCheckForWinTestcases() []BoardCheckForWinSuccessTestCase {
 	return testcases
 }
 
-func TestBoardCheckForWinSuccessWhite(t *testing.T) {
-	testcases := getCheckForWinTestcases()
+func TestBoardcheckForWinSuccessWhite(t *testing.T) {
+	testcases := getcheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
 			gameBoard := NewBoard()
@@ -151,8 +151,8 @@ func TestBoardCheckForWinSuccessWhite(t *testing.T) {
 	}
 }
 
-func TestBoardCheckForWinSuccessBlack(t *testing.T) {
-	testcases := getCheckForWinTestcases()
+func TestBoardcheckForWinSuccessBlack(t *testing.T) {
+	testcases := getcheckForWinTestcases()
 	for _, testcase := range testcases {
 		t.Run(testcase.label, func(t *testing.T) {
 			gameBoard := NewBoard()

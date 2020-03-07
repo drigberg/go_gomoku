@@ -76,8 +76,7 @@ func NewServer() Server {
 	}
 }
 
-// CreateGame creates a game and returns the id
-func (server *Server) CreateGame(req Request, socketClient *SocketClient) int {
+func (server *Server) createGame(req Request, socketClient *SocketClient) int {
 	server.M.Lock()
 	defer server.M.Unlock()
 	defer func() { server.gameID++ }()
@@ -101,8 +100,7 @@ func (server *Server) CreateGame(req Request, socketClient *SocketClient) int {
 	return server.gameID
 }
 
-// ParseMove validates the string from a mv command
-func (server *Server) ParseMove(req Request, moveStr string) (bool, Coord, Request) {
+func (server *Server) parseMove(req Request, moveStr string) (bool, Coord, Request) {
 	coordinates := strings.Split(moveStr, " ")
 
 	if len(coordinates) != 2 {
@@ -140,7 +138,7 @@ func (server *Server) ParseMove(req Request, moveStr string) (bool, Coord, Reque
 		Y: y,
 	}
 
-	ok, errorResponse := server.games[req.GameID].Board.CheckOwnership(req.GameID, req.UserID, move)
+	ok, errorResponse := server.games[req.GameID].Board.checkOwnership(req.GameID, req.UserID, move)
 	if !ok {
 		return false, Coord{}, errorResponse
 	}
@@ -177,7 +175,7 @@ func (socketClientResponse *SocketClientResponse) sendBackoff(data []byte, i int
 
 // SendToClient tries to send a request to socketClient, with backoff
 func (socketClientResponse *SocketClientResponse) send() {
-	data, err := GobToBytes(socketClientResponse.response)
+	data, err := gobToBytes(socketClientResponse.response)
 
 	if err != nil {
 		log.Println(err)
@@ -188,7 +186,7 @@ func (socketClientResponse *SocketClientResponse) send() {
 }
 
 func (server *Server) handleCreate(req Request, socketClient *SocketClient) []SocketClientResponse {
-	gameID := server.CreateGame(req, socketClient)
+	gameID := server.createGame(req, socketClient)
 	response := Request{
 		GameID:  gameID,
 		Action:  CREATE,
@@ -367,7 +365,7 @@ func (server *Server) handleMove(req Request, socketClient *SocketClient, active
 
 			moves := [3]Coord{}
 			for i, moveStr := range moveStrs {
-				ok, move, errorResponse := server.ParseMove(req, moveStr)
+				ok, move, errorResponse := server.parseMove(req, moveStr)
 
 				if !ok {
 					return []SocketClientResponse{
@@ -398,7 +396,7 @@ func (server *Server) handleMove(req Request, socketClient *SocketClient, active
 			response.Colors[req.UserID] = "black"
 			response.Colors[opponentID] = "white"
 		} else {
-			ok, move, errorResponse := server.ParseMove(req, req.Data)
+			ok, move, errorResponse := server.parseMove(req, req.Data)
 
 			if !ok {
 				return []SocketClientResponse{
@@ -418,7 +416,7 @@ func (server *Server) handleMove(req Request, socketClient *SocketClient, active
 			message = "(played on " + req.Data + " )"
 		}
 	default:
-		ok, move, errorResponse := server.ParseMove(req, req.Data)
+		ok, move, errorResponse := server.parseMove(req, req.Data)
 
 		if !ok {
 			return []SocketClientResponse{
@@ -431,7 +429,7 @@ func (server *Server) handleMove(req Request, socketClient *SocketClient, active
 
 		activeGame.PlayMove(move, activeGame.Players[req.UserID].Color)
 
-		gameOver = activeGame.Board.CheckForWin(move, activeGame.Players[req.UserID].Color)
+		gameOver = activeGame.Board.checkForWin(move, activeGame.Players[req.UserID].Color)
 		if gameOver {
 			activeGame.IsOver = true
 			response.GameOver = true
@@ -478,8 +476,7 @@ func (server *Server) handleMove(req Request, socketClient *SocketClient, active
 	}
 }
 
-// HandleRequest handles a request
-func (server *Server) HandleRequest(req Request, socketClient *SocketClient) {
+func (server *Server) handleRequest(req Request, socketClient *SocketClient) {
 	log.Println("Request:", socketClient, req)
 
 	activeGame := server.games[req.GameID]
@@ -565,7 +562,7 @@ func (server *Server) Listen(port string) {
 		unregister: make(chan *SocketClient),
 	}
 
-	go socketClientManager.start()
+	go socketClientManager.Start()
 
 	log.Println("Server listening on port " + port + "!")
 
@@ -620,8 +617,8 @@ func (manager *SocketClientManager) receive(socketClient *SocketClient, server *
 		length, err := socketClient.Socket.Read(message)
 
 		if length > 0 {
-			request := DecodeGob(message)
-			server.HandleRequest(request, socketClient)
+			request := decodeGob(message)
+			server.handleRequest(request, socketClient)
 		}
 
 		if err != nil {
@@ -645,7 +642,7 @@ func (manager *SocketClientManager) send(socketClient *SocketClient) {
 	}
 }
 
-func (manager *SocketClientManager) start() {
+func (manager *SocketClientManager) Start() {
 	log.Println("SocketClient manager listening for clients joining/leaving...")
 	for {
 		select {
